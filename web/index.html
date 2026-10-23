@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynalogic Hyperion (1983) — WebAssembly Emulator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top-bar">
+    <div class="brand">
+      <span class="brand-badge">DYNALOGIC</span>
+      <h1>Hyperion <span class="year-tag">1983</span></h1>
+      <span class="subtitle">Canadian Portable 8088 PC Clone &bull; Authentic BIOS V3.0 &amp; U3 Character ROM</span>
+    </div>
+    <div class="top-controls">
+      <div class="ctrl-group">
+        <label for="bios-select">BIOS ROM</label>
+        <select id="bios-select">
+          <option value="0" selected>V3.0 Rev C7 (U48)</option>
+          <option value="1">V3.0 Rev C1 (U48)</option>
+        </select>
+      </div>
+      <div class="ctrl-group">
+        <label for="ram-select">System RAM</label>
+        <select id="ram-select">
+          <option value="256" selected>256 KB (Standard + RAM Disk)</option>
+          <option value="640">640 KB (Expanded)</option>
+        </select>
+      </div>
+      <button id="btn-warm-boot" class="btn" title="Send Ctrl+Alt+Del warm reboot">Ctrl+Alt+Del</button>
+      <button id="btn-cold-reset" class="btn btn-amber" title="Cold power-cycle reset">Cold Reset</button>
+      <button id="btn-audio" class="btn" aria-pressed="false" title="Toggle WebAudio 8253 PIT PC Speaker">Speaker: Off</button>
+      <button id="btn-crt-fx" class="btn active" aria-pressed="true" title="Toggle CRT scanline &amp; phosphor bloom">CRT Scanlines</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- Molded Dynalogic Hyperion Front Bezel -->
+    <section class="hyperion-chassis" aria-label="Dynalogic Hyperion Computer">
+      <div class="chassis-inner">
+        <!-- Left: 7-inch Amber CRT & Soft-Key Bezel -->
+        <div class="crt-bay">
+          <div class="crt-bezel">
+            <div class="crt-screen-wrap scanlines" id="crt-wrap" tabindex="0" aria-label="Hyperion 7-inch Amber CRT Display (Click to focus keyboard)">
+              <canvas id="crt-canvas" width="640" height="250"></canvas>
+              <div class="crt-glare"></div>
+            </div>
+
+            <!-- Soft-key alignment ticks directly under Line 25 -->
+            <div class="softkey-ticks" aria-hidden="true">
+              <div class="tick-bank">
+                <span>F1</span><span>F2</span><span>F3</span><span>F4</span><span>F5</span>
+              </div>
+              <div class="tick-clock">RTC</div>
+              <div class="tick-bank">
+                <span>F6</span><span>F7</span><span>F8</span><span>F9</span><span>F10</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Physical F1 - F10 Soft Keys -->
+          <div class="softkeys-bar" role="toolbar" aria-label="Hyperion F1 to F10 Soft Keys">
+            <div class="softkey-group">
+              <button class="softkey" data-xt="0x3B" data-key="F1"><span class="sk-num">F1</span><span class="sk-lbl" id="sk-lbl-0">LASTLN</span></button>
+              <button class="softkey" data-xt="0x3C" data-key="F2"><span class="sk-num">F2</span><span class="sk-lbl" id="sk-lbl-1">Disks</span></button>
+              <button class="softkey" data-xt="0x3D" data-key="F3"><span class="sk-num">F3</span><span class="sk-lbl" id="sk-lbl-2">Files</span></button>
+              <button class="softkey" data-xt="0x3E" data-key="F4"><span class="sk-num">F4</span><span class="sk-lbl" id="sk-lbl-3">MODE</span></button>
+              <button class="softkey" data-xt="0x3F" data-key="F5"><span class="sk-num">F5</span><span class="sk-lbl" id="sk-lbl-4">DIR/P</span></button>
+            </div>
+            <div class="softkey-gap">
+              <span class="hyperion-logo-text">hyperion</span>
+            </div>
+            <div class="softkey-group">
+              <button class="softkey" data-xt="0x40" data-key="F6"><span class="sk-num">F6</span><span class="sk-lbl" id="sk-lbl-5">&mdash;</span></button>
+              <button class="softkey" data-xt="0x41" data-key="F7"><span class="sk-num">F7</span><span class="sk-lbl" id="sk-lbl-6">&mdash;</span></button>
+              <button class="softkey" data-xt="0x42" data-key="F8"><span class="sk-num">F8</span><span class="sk-lbl" id="sk-lbl-7">&mdash;</span></button>
+              <button class="softkey" data-xt="0x43" data-key="F9"><span class="sk-num">F9</span><span class="sk-lbl" id="sk-lbl-8">XPLAIN</span></button>
+              <button class="softkey" data-xt="0x44" data-key="F10"><span class="sk-num">F10</span><span class="sk-lbl" id="sk-lbl-9">HELP</span></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Dual 5.25-inch Floppy Disk Drives (Drive A: & Drive B:) -->
+        <aside class="drives-bay">
+          <!-- Drive A: -->
+          <div class="floppy-unit">
+            <div class="floppy-header">
+              <span class="drive-title">DRIVE A: <small>(System / Boot)</small></span>
+              <span class="drive-led" id="led-drive-0" title="Drive A: Motor / Activity LED"></span>
+            </div>
+            <div class="floppy-slot">
+              <div class="slot-opening"></div>
+              <div class="slot-latch"></div>
+            </div>
+            <select id="disk-select-0" class="disk-select" aria-label="Drive A Diskette">
+              <option value="HYPMSTRU.IMD" selected>Master User Diskette (MS-DOS 1.25H)</option>
+              <option value="HYPDOS21.IMD">Hyperion MS-DOS 2.11 System Diskette</option>
+              <option value="HYPDIAG.IMD">Master Diagnostic Diskette (CRT.BAS)</option>
+              <option value="HYDIAGR1.IMD">Diagnostic Diskette Rev 1</option>
+              <option value="HYPMSPRG.IMD">Master Programmer Diskette (Tools)</option>
+              <option value="MULTIPLN.IMD">Master Multiplan Diskette (MP.COM)</option>
+              <option value="HYPUSRDS.IMD">Hyperion User Data Diskette</option>
+              <option value="">-- Ejected --</option>
+            </select>
+            <div class="drive-actions">
+              <label class="btn btn-sm file-btn">
+                Load .IMD / .IMG
+                <input type="file" id="disk-upload-0" accept=".imd,.IMD,.img,.IMG,.dsk,.DSK" hidden>
+              </label>
+              <span class="disk-status" id="disk-status-0">80 tracks</span>
+            </div>
+          </div>
+
+          <!-- Drive B: -->
+          <div class="floppy-unit">
+            <div class="floppy-header">
+              <span class="drive-title">DRIVE B: <small>(Program / Data)</small></span>
+              <span class="drive-led" id="led-drive-1" title="Drive B: Motor / Activity LED"></span>
+            </div>
+            <div class="floppy-slot">
+              <div class="slot-opening"></div>
+              <div class="slot-latch"></div>
+            </div>
+            <select id="disk-select-1" class="disk-select" aria-label="Drive B Diskette">
+              <option value="MULTIPLN.IMD" selected>Master Multiplan Diskette (MP.COM)</option>
+              <option value="HYPMSPRG.IMD">Master Programmer Diskette (Tools)</option>
+              <option value="HYPUSRDS.IMD">Hyperion User Data Diskette</option>
+              <option value="HYPMSTRU.IMD">Master User Diskette (MS-DOS 1.25H)</option>
+              <option value="HYPDOS21.IMD">Hyperion MS-DOS 2.11 System Diskette</option>
+              <option value="HYPDIAG.IMD">Master Diagnostic Diskette (CRT.BAS)</option>
+              <option value="">-- Ejected --</option>
+            </select>
+            <div class="drive-actions">
+              <label class="btn btn-sm file-btn">
+                Load .IMD / .IMG
+                <input type="file" id="disk-upload-1" accept=".imd,.IMD,.img,.IMG,.dsk,.DSK" hidden>
+              </label>
+              <span class="disk-status" id="disk-status-1">80 tracks</span>
+            </div>
+          </div>
+
+          <!-- Quick Presets & Type-In Helper -->
+          <div class="quick-panel">
+            <h3>Quick Presets &amp; Macros</h3>
+            <div class="preset-grid">
+              <button class="btn btn-sm" id="preset-dos125">Boot H-DOS 1.25H</button>
+              <button class="btn btn-sm" id="preset-dos211">Boot MS-DOS 2.11</button>
+              <button class="btn btn-sm" id="preset-diag">Boot Diagnostics</button>
+              <button class="btn btn-sm btn-amber" id="macro-multiplan">Run Multiplan (B:MP)</button>
+            </div>
+            <form id="type-form" class="type-form">
+              <input type="text" id="type-input" placeholder="Type DOS command (e.g. DIR A:)..." autocomplete="off">
+              <button type="submit" class="btn btn-sm">Send &crarr;</button>
+            </form>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Bottom Telemetry & Hardware Status Strip -->
+    <section class="telemetry-bar">
+      <div class="tele-item">
+        <span class="tele-label">CPU</span>
+        <span class="tele-val" id="tele-cpu">CS:FE00 IP:001A</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">REGS</span>
+        <span class="tele-val" id="tele-regs">AX:0000 BX:0000 CX:0000 DX:0000</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">VIDEO MODE</span>
+        <span class="tele-val" id="tele-video">82h (80&times;25 Hyperion Text)</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">VRAM MAP (A8000h)</span>
+        <span class="tele-val" id="tele-vmap">3 (B000h)</span>
+      </div>
+      <div class="tele-item">
+        <span class="tele-label">STATUS</span>
+        <span class="tele-val" id="tele-status">Initializing Wasm...</span>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,504 @@
+:root {
+  --bg-dark: #141311;
+  --chassis-cream: #d8d1c2;
+  --chassis-shadow: #aba290;
+  --bezel-charcoal: #262523;
+  --bezel-inner: #181715;
+  --crt-black: #0a0808;
+  --amber-dim: #995200;
+  --amber-main: #ee8800;
+  --amber-bright: #ffc838;
+  --text-light: #e8e2d5;
+  --text-muted: #9e9689;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: radial-gradient(circle at 50% 20%, #24211d 0%, #100f0d 100%);
+  color: var(--text-light);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  background: #1b1917;
+  border-bottom: 1px solid #332e28;
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.brand-badge {
+  background: var(--amber-main);
+  color: #141008;
+  font-weight: 800;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  padding: 3px 7px;
+  border-radius: 3px;
+}
+
+.brand h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff5e4;
+}
+
+.year-tag {
+  font-size: 0.85rem;
+  color: var(--amber-bright);
+  font-weight: 500;
+}
+
+.subtitle {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.top-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ctrl-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #25221f;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid #3a352f;
+}
+
+.ctrl-group label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+select, input[type="text"] {
+  background: #161412;
+  color: var(--text-light);
+  border: 1px solid #443e36;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+}
+
+.btn {
+  background: #2b2723;
+  color: var(--text-light);
+  border: 1px solid #484139;
+  border-radius: 5px;
+  padding: 6px 11px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  background: #38332d;
+  border-color: var(--amber-main);
+}
+
+.btn.active, .btn[aria-pressed="true"] {
+  background: #3a2912;
+  border-color: var(--amber-main);
+  color: var(--amber-bright);
+}
+
+.btn-amber {
+  background: #523207;
+  border-color: var(--amber-main);
+  color: var(--amber-bright);
+}
+
+.btn-amber:hover {
+  background: #6e4309;
+}
+
+.btn-sm {
+  padding: 5px 9px;
+  font-size: 0.76rem;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  gap: 16px;
+}
+
+/* Molded Dynalogic Hyperion Case */
+.hyperion-chassis {
+  background: linear-gradient(180deg, #dfd9cb 0%, #cfc7b6 100%);
+  border: 3px solid #b5ac9a;
+  border-bottom-width: 6px;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.65),
+    inset 0 2px 0 rgba(255, 255, 255, 0.55);
+  max-width: 1220px;
+  width: 100%;
+}
+
+.chassis-inner {
+  background: var(--bezel-charcoal);
+  border-radius: 12px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 20px;
+  box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.75);
+}
+
+@media (max-width: 1024px) {
+  .chassis-inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 7-inch Amber CRT Bay */
+.crt-bay {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.crt-bezel {
+  background: var(--bezel-inner);
+  border: 2px solid #35322e;
+  border-radius: 12px;
+  padding: 16px 18px 10px;
+  box-shadow: inset 0 6px 20px rgba(0, 0, 0, 0.9);
+}
+
+.crt-screen-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 640 / 420;
+  background: var(--crt-black);
+  border-radius: 10px;
+  overflow: hidden;
+  outline: none;
+  border: 2px solid #2a241d;
+  box-shadow:
+    0 0 28px rgba(238, 136, 0, 0.14),
+    inset 0 0 18px rgba(0, 0, 0, 0.85);
+  cursor: text;
+}
+
+.crt-screen-wrap:focus {
+  border-color: var(--amber-main);
+  box-shadow:
+    0 0 32px rgba(238, 136, 0, 0.3),
+    inset 0 0 18px rgba(0, 0, 0, 0.85);
+}
+
+#crt-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.crt-screen-wrap.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.28) 3px
+  );
+  pointer-events: none;
+}
+
+.crt-glare {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 25% 15%, rgba(255, 220, 160, 0.045) 0%, transparent 55%);
+  pointer-events: none;
+}
+
+/* Soft-key alignment ticks directly under Line 25 */
+.softkey-ticks {
+  display: grid;
+  grid-template-columns: 5fr 2fr 5fr;
+  align-items: center;
+  padding: 6px 4px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.68rem;
+  color: #8c8273;
+}
+
+.tick-bank {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  text-align: center;
+}
+
+.tick-clock {
+  text-align: center;
+  color: #6b6358;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+}
+
+/* Physical F1 - F10 Soft Keys */
+.softkeys-bar {
+  display: grid;
+  grid-template-columns: 5fr 2fr 5fr;
+  gap: 8px;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.softkey-group {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.softkey {
+  background: linear-gradient(180deg, #433f3a 0%, #2f2c28 100%);
+  border: 1px solid #59534c;
+  border-bottom: 3px solid #1b1917;
+  border-radius: 5px;
+  padding: 6px 4px;
+  color: #f0e8da;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transition: transform 0.06s, border-color 0.12s;
+}
+
+.softkey:hover {
+  border-color: var(--amber-main);
+}
+
+.softkey:active {
+  transform: translateY(1px);
+  border-bottom-width: 2px;
+}
+
+.sk-num {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--amber-bright);
+}
+
+.sk-lbl {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.68rem;
+  color: #cfc6b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.softkey-gap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hyperion-logo-text {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: 0.03em;
+  color: #d8d1c2;
+}
+
+/* Right Bay: Dual 5.25-inch Floppy Disk Drives */
+.drives-bay {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.floppy-unit {
+  background: #1c1b19;
+  border: 1px solid #38342f;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.floppy-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.drive-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #e4dccd;
+}
+
+.drive-title small {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.drive-led {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #381810;
+  border: 1px solid #52261b;
+  transition: background 0.08s, box-shadow 0.08s;
+}
+
+.drive-led.on {
+  background: #ff4411;
+  box-shadow: 0 0 10px #ff5500, 0 0 4px #ffaa44;
+}
+
+.floppy-slot {
+  height: 18px;
+  background: #0d0c0b;
+  border: 1px solid #2e2a26;
+  border-radius: 3px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slot-opening {
+  width: 82%;
+  height: 4px;
+  background: #040404;
+  border-radius: 2px;
+}
+
+.slot-latch {
+  position: absolute;
+  width: 34px;
+  height: 12px;
+  background: #3a3631;
+  border: 1px solid #524c45;
+  border-radius: 2px;
+}
+
+.disk-select {
+  width: 100%;
+}
+
+.drive-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.file-btn {
+  display: inline-block;
+}
+
+.disk-status {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: var(--amber-bright);
+}
+
+.quick-panel {
+  background: #1c1b19;
+  border: 1px solid #38342f;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quick-panel h3 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.preset-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.type-form {
+  display: flex;
+  gap: 6px;
+}
+
+.type-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Telemetry Bar */
+.telemetry-bar {
+  max-width: 1220px;
+  width: 100%;
+  background: #1b1917;
+  border: 1px solid #332e28;
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+}
+
+.tele-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tele-label {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.tele-val {
+  color: var(--amber-bright);
+}
