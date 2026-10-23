@@ -1,0 +1,32 @@
+# Downloaded vintage archive (PDF manuals, brochures, raw disk dumps, ROMs)
+archive/
+*.pdf
+*.zip
+*.IMD
+*.imd
+*.img
+*.dsk
+*.bin
+!roms/*.bin
+
+# Build artifacts
+build/
+dist/
+node_modules/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+*.wasm
+*.wat
+!web/*.wasm
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
