@@ -1,6 +1,5 @@
 # Downloaded vintage archive (PDF manuals, brochures, raw disk dumps, ROMs)
 archive/
-web/disks/
 *.pdf
 *.zip
 *.IMD
@@ -9,6 +8,7 @@ web/disks/
 *.dsk
 *.bin
 !roms/*.bin
+!web/disks/*.IMD
 
 # Build artifacts
 build/

@@ -73,6 +73,15 @@ body {
   color: var(--text-muted);
 }
 
+.subtitle a {
+  color: var(--amber-bright);
+  text-decoration: none;
+}
+
+.subtitle a:hover {
+  text-decoration: underline;
+}
+
 .top-controls {
   display: flex;
   align-items: center;
@@ -502,3 +511,96 @@ select, input[type="text"] {
 .tele-val {
   color: var(--amber-bright);
 }
+
+.crt-screen-wrap.drop {
+  outline: 3px dashed var(--amber-bright);
+  outline-offset: 4px;
+}
+
+/* Dorado-Style "What can I do?" Interactive Guide Card */
+.guide-card {
+  max-width: 1220px;
+  width: 100%;
+  background: #1b1917;
+  border: 1px solid #332e28;
+  border-radius: 8px;
+  padding: 16px 20px;
+  font-size: 0.84rem;
+  color: var(--text-light);
+}
+
+.guide-card h2 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #fff5e4;
+  margin-bottom: 4px;
+}
+
+.guide-card .lead {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 12px;
+}
+
+.guide-card table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.guide-card td {
+  padding: 5px 10px 5px 0;
+  vertical-align: middle;
+  border-bottom: 1px solid #26231f;
+}
+
+.guide-card td.cmd {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.guide-card code.k {
+  background: #26231f;
+  border: 1px solid #423c34;
+  border-radius: 4px;
+  padding: 2px 7px;
+  color: var(--amber-bright);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.guide-card button.try {
+  background: #3d280a;
+  border: 1px solid var(--amber-main);
+  color: var(--amber-bright);
+  border-radius: 5px;
+  padding: 4px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.guide-card button.try:hover {
+  background: #57390e;
+}
+
+details.keys {
+  margin-top: 12px;
+}
+
+details.keys > summary {
+  cursor: pointer;
+  color: var(--amber-bright);
+  font-size: 0.82rem;
+  font-weight: 600;
+  width: fit-content;
+}
+
+details.keys table {
+  margin-top: 8px;
+}
+
+details.keys a {
+  color: var(--amber-bright);
+}
+

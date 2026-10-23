@@ -1,0 +1,65 @@
+name: Deploy WASM emulator to GitHub Pages
+
+# Builds the WebAssembly Dynalogic Hyperion emulator, runs the native boot
+# verification suite, and publishes web/ to GitHub Pages.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'roms/**'
+      - 'tests/**'
+      - 'web/**'
+      - 'Makefile'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure clang with wasm32 target is available
+        run: |
+          if ! command -v clang >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq clang
+          fi
+          clang --version
+
+      - name: Build WebAssembly module and run boot test
+        run: |
+          make wasm WASM_CC=clang
+          make test WASM_CC=clang
+
+      - name: Stamp cache-busting build ID into frontend assets
+        run: |
+          BUILD_ID=$(git rev-parse --short HEAD)
+          sed -e "s|hyperion\.wasm|hyperion.wasm?v=${BUILD_ID}|g" web/app.js > web/app.js.tmp && mv -f web/app.js.tmp web/app.js
+          sed -e "s|src=\"app\.js\"|src=\"app.js?v=${BUILD_ID}\"|g" -e "s|href=\"style\.css\"|href=\"style.css?v=${BUILD_ID}\"|g" web/index.html > web/index.html.tmp && mv -f web/index.html.tmp web/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

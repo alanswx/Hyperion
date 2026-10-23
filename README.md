@@ -1,5 +1,7 @@
 # Dynalogic Hyperion (1983) — WebAssembly Emulator
 
+**[Run the Dynalogic Hyperion in your browser (GitHub Pages) &rarr;](https://alanswx.github.io/Hyperion/)**
+
 A cycle/bus-accurate WebAssembly emulator for the **1983 Dynalogic Hyperion**, the iconic Canadian portable IBM PC clone designed in Ottawa by Dynalogic Info-Tech Corporation (industrial design by Hovey-Kelley Design, who went on to design the Apple Macintosh).
 
 It runs the **authentic Hyperion BIOS ROMs** (`U48-700002-000-08-V3.0-C7.bin` and `C1.bin`) and **Character Generator ROM** (`U3-CHAR_ROM-2732A.bin`), booting the original Hyperion `.IMD` / `.IMG` floppy diskettes (`MS-DOS 1.25H`, `MS-DOS 2.11`, `Hyperion Diagnostics + BASICA`, and `Microsoft Multiplan`) directly in the browser.

@@ -1,14 +1,21 @@
 # Dynalogic Hyperion (1983) Emulator Makefile
 
+ifneq ($(wildcard /opt/homebrew/opt/llvm/bin/clang),)
 WASM_CC ?= /opt/homebrew/opt/llvm/bin/clang
+else
+WASM_CC ?= clang
+endif
+
 HOST_CC ?= cc
 CFLAGS  ?= -O3 -Wall -Wextra
 
-.PHONY: all wasm test disks serve clean
+.PHONY: all wasm web test disks serve clean
 
 all: wasm
 
 wasm: web/hyperion.wasm
+
+web: wasm disks
 
 web/hyperion.wasm: src/hyperion.c src/hyperion.h src/decode_tables.h src/roms.h
 	@mkdir -p web
@@ -27,7 +34,7 @@ disks:
 test: wasm
 	@mkdir -p build
 	$(HOST_CC) $(CFLAGS) src/hyperion.c tests/test_boot.c -o build/test_boot
-	./build/test_boot archive/software/HYPMSTRU.IMD
+	./build/test_boot web/disks/HYPMSTRU.IMD
 
 serve: wasm disks
 	@echo "Serving Hyperion WebAssembly Emulator at http://localhost:8080/web/"

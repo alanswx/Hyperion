@@ -194,11 +194,17 @@
     }
   }
 
+  function fastForwardBoot(frames = 175) {
+    if (!ex) return;
+    for (let i = 0; i < frames; i++) {
+      ex.emu_run_frame();
+    }
+  }
+
   function updateSoftKeyLabelsFromVram() {
     if (!ex) return;
     const vramPtr = ex.emu_get_vram();
     const vram = new Uint8Array(wasmMemory.buffer, vramPtr, 4000);
-    // Line 25 (row 24) cols: F1..F5 at [0..6, 7..13, 14..20, 21..27, 28..34], F6..F10 at [45..51, 52..58, 59..65, 66..72, 73..79]
     const spans = [
       [0, 6], [7, 13], [14, 20], [21, 27], [28, 34],
       [45, 51], [52, 58], [59, 65], [66, 72], [73, 79]
@@ -280,9 +286,17 @@
     }, delayMs);
   }
 
+  function tapXtKey(xtCode) {
+    if (!ex) return;
+    ex.emu_xt_key_event(xtCode, 1);
+    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), 60);
+  }
+
   // Event Listeners
   crtWrap.addEventListener("keydown", (e) => {
     if (!ex) return;
+    // Allow browser paste (Ctrl+V / Cmd+V)
+    if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
     const xt = CODE_TO_XT_SCANCODE[e.code];
     if (xt) {
       e.preventDefault();
@@ -292,6 +306,7 @@
 
   crtWrap.addEventListener("keyup", (e) => {
     if (!ex) return;
+    if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
     const xt = CODE_TO_XT_SCANCODE[e.code];
     if (xt) {
       e.preventDefault();
@@ -299,12 +314,41 @@
     }
   });
 
+  // Clipboard Paste support (like Dorado)
+  window.addEventListener("paste", (e) => {
+    if (!ex || document.activeElement === document.getElementById("type-input")) return;
+    const text = e.clipboardData ? e.clipboardData.getData("text") : "";
+    if (text) {
+      e.preventDefault();
+      const normalized = text.replace(/\r?\n/g, "\r");
+      sendAsciiString(normalized, 20);
+      teleStatus.textContent = `Pasted ${normalized.length} chars`;
+    }
+  });
+
+  // Drag-and-drop diskette onto CRT screen (like Dorado)
+  crtWrap.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    crtWrap.classList.add("drop");
+  });
+  crtWrap.addEventListener("dragleave", () => {
+    crtWrap.classList.remove("drop");
+  });
+  crtWrap.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    crtWrap.classList.remove("drop");
+    const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (!file || !ex) return;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    mountDiskBytes(0, bytes, file.name);
+    resetMachine(false);
+    crtWrap.focus();
+  });
+
   document.querySelectorAll(".softkey").forEach((btn) => {
     btn.addEventListener("click", () => {
-      if (!ex) return;
       const xt = parseInt(btn.dataset.xt, 16);
-      ex.emu_xt_key_event(xt, 1);
-      setTimeout(() => ex.emu_xt_key_event(xt, 0), 60);
+      tapXtKey(xt);
       crtWrap.focus();
     });
   });
@@ -353,37 +397,74 @@
     });
   });
 
-  document.getElementById("preset-dos125").addEventListener("click", async () => {
-    diskSelects[0].value = "HYPMSTRU.IMD";
-    diskSelects[1].value = "HYPMSPRG.IMD";
-    await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
-    resetMachine(false);
+  async function bootPreset(presetName) {
+    if (presetName === "dos211") {
+      diskSelects[0].value = "HYPDOS21.IMD";
+      diskSelects[1].value = "MULTIPLN.IMD";
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      resetMachine(false);
+    } else if (presetName === "diag") {
+      diskSelects[0].value = "HYPDIAG.IMD";
+      await loadSelectedDisk(0);
+      resetMachine(false);
+    } else if (presetName === "multiplan") {
+      diskSelects[0].value = "HYPMSTRU.IMD";
+      diskSelects[1].value = "MULTIPLN.IMD";
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      resetMachine(false);
+      fastForwardBoot(175);
+      sendAsciiString("B:\rMP\r", 35);
+      teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
+    } else {
+      diskSelects[0].value = "HYPMSTRU.IMD";
+      diskSelects[1].value = "MULTIPLN.IMD";
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      resetMachine(false);
+    }
     crtWrap.focus();
-  });
+  }
 
-  document.getElementById("preset-dos211").addEventListener("click", async () => {
-    diskSelects[0].value = "HYPDOS21.IMD";
-    diskSelects[1].value = "MULTIPLN.IMD";
-    await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
-    resetMachine(false);
-    crtWrap.focus();
-  });
-
-  document.getElementById("preset-diag").addEventListener("click", async () => {
-    diskSelects[0].value = "HYPDIAG.IMD";
-    await loadSelectedDisk(0);
-    resetMachine(false);
-    crtWrap.focus();
-  });
-
+  document.getElementById("preset-dos125").addEventListener("click", () => bootPreset("dos125"));
+  document.getElementById("preset-dos211").addEventListener("click", () => bootPreset("dos211"));
+  document.getElementById("preset-diag").addEventListener("click", () => bootPreset("diag"));
   document.getElementById("macro-multiplan").addEventListener("click", async () => {
     if (diskSelects[1].value !== "MULTIPLN.IMD") {
       diskSelects[1].value = "MULTIPLN.IMD";
       await loadSelectedDisk(1);
     }
-    sendAsciiString("B:\rMP\r", 40);
+    sendAsciiString("B:\rMP\r", 35);
     teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
     crtWrap.focus();
+  });
+
+  // Dorado-style "Try it" buttons in #guide
+  document.querySelectorAll("#guide button.try").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!ex) return;
+      const cmd = btn.dataset.cmd;
+      const action = btn.dataset.action;
+      if (cmd) {
+        sendAsciiString(cmd + "\r", 25);
+        teleStatus.textContent = `Running: ${cmd}`;
+      } else if (action === "multiplan") {
+        if (diskSelects[1].value !== "MULTIPLN.IMD") {
+          diskSelects[1].value = "MULTIPLN.IMD";
+          await loadSelectedDisk(1);
+        }
+        sendAsciiString("B:\rMP\r", 35);
+        teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
+      } else if (action === "diag-f6" || action === "diag-f3") {
+        diskSelects[0].value = "HYPDIAG.IMD";
+        await loadSelectedDisk(0);
+        resetMachine(false);
+        fastForwardBoot(175);
+        tapXtKey(action === "diag-f6" ? 0x40 : 0x3D);
+        teleStatus.textContent = action === "diag-f6"
+          ? "Running Diagnostics F6 (Dynalogic CRT Attributes)"
+          : "Running Diagnostics F3 (320x250 4-Shade Amber Low-Res Graphics)";
+      }
+      crtWrap.focus();
+    });
   });
 
   document.getElementById("type-form").addEventListener("submit", (e) => {
@@ -414,10 +495,9 @@
       });
 
       ex = instance.exports;
-      resetMachine(false);
-      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      const bootParam = new URLSearchParams(window.location.search).get("boot");
+      await bootPreset(bootParam || "dos125");
       teleStatus.textContent = "Running (Click CRT to focus keyboard)";
-      crtWrap.focus();
       requestAnimationFrame(renderFrame);
     } catch (err) {
       console.error(err);

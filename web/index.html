@@ -11,7 +11,10 @@
     <div class="brand">
       <span class="brand-badge">DYNALOGIC</span>
       <h1>Hyperion <span class="year-tag">1983</span></h1>
-      <span class="subtitle">Canadian Portable 8088 PC Clone &bull; Authentic BIOS V3.0 &amp; U3 Character ROM</span>
+      <span class="subtitle">
+        Canadian Portable 8088 PC Clone &bull; Authentic BIOS V3.0 &amp; U3 Character ROM &bull;
+        <a href="https://github.com/alanswx/Hyperion" target="_blank" rel="noopener">GitHub</a>
+      </span>
     </div>
     <div class="top-controls">
       <div class="ctrl-group">
@@ -42,7 +45,7 @@
         <!-- Left: 7-inch Amber CRT & Soft-Key Bezel -->
         <div class="crt-bay">
           <div class="crt-bezel">
-            <div class="crt-screen-wrap scanlines" id="crt-wrap" tabindex="0" aria-label="Hyperion 7-inch Amber CRT Display (Click to focus keyboard)">
+            <div class="crt-screen-wrap scanlines" id="crt-wrap" tabindex="0" aria-label="Hyperion 7-inch Amber CRT Display (Click to focus keyboard, or drop a .IMD/.IMG disk image)">
               <canvas id="crt-canvas" width="640" height="250"></canvas>
               <div class="crt-glare"></div>
             </div>
@@ -180,6 +183,73 @@
         <span class="tele-label">STATUS</span>
         <span class="tele-val" id="tele-status">Initializing Wasm...</span>
       </div>
+    </section>
+
+    <!-- Dorado-Style "What can I do?" Interactive Guide & Keyboard Reference -->
+    <section class="guide-card" id="guide">
+      <h2>What can I do on the Dynalogic Hyperion?</h2>
+      <p class="lead">
+        Click the amber CRT display to type directly, press the physical <b>F1&ndash;F10 soft keys</b> below the screen,
+        or click any <b>Try it</b> button below to run a command or switch disks automatically:
+      </p>
+      <table>
+        <tbody>
+          <tr>
+            <td class="cmd"><code class="k">B:MP</code></td>
+            <td>Launch <b>Microsoft Multiplan 1.06</b> for the Hyperion from Drive B:, with dynamic soft-key labels on Line 25.</td>
+            <td class="cmd"><button type="button" class="try" data-action="multiplan">Try it</button></td>
+          </tr>
+          <tr>
+            <td class="cmd"><code class="k">DISKNAME</code></td>
+            <td>Inspect the Hyperion diskette volume names mounted in <b>Drive A:</b> and <b>Drive B:</b>.</td>
+            <td class="cmd"><button type="button" class="try" data-cmd="C:DISKNAME">Try it</button></td>
+          </tr>
+          <tr>
+            <td class="cmd"><code class="k">DIR A:</code></td>
+            <td>List all system utilities and programs on the <b>Master User Diskette</b> in Drive A:.</td>
+            <td class="cmd"><button type="button" class="try" data-cmd="DIR A:">Try it</button></td>
+          </tr>
+          <tr>
+            <td class="cmd"><code class="k">CHKDSK C:</code></td>
+            <td>Check the <b>90 KB Electronic RAM Disk (C:)</b> automatically created in the upper 96 KB of the 256 KB RAM.</td>
+            <td class="cmd"><button type="button" class="try" data-cmd="C:CHKDSK C:">Try it</button></td>
+          </tr>
+          <tr>
+            <td class="cmd"><code class="k">Diagnostics &bull; F6</code></td>
+            <td>Boot the <b>Hyperion Master Diagnostic Diskette</b> and run <b>TEST #3: Dynalogic CRT Attributes</b> (underline, reverse, blink, superscript/subscript, bold, double-width).</td>
+            <td class="cmd"><button type="button" class="try" data-action="diag-f6">Try it</button></td>
+          </tr>
+          <tr>
+            <td class="cmd"><code class="k">Diagnostics &bull; F3</code></td>
+            <td>Boot <b>Diagnostics</b> and run the <b>320&times;250 4-Shade Amber Low-Res Graphics</b> test (<code class="k">CRT.BAS</code> mode <code class="k">85h</code>).</td>
+            <td class="cmd"><button type="button" class="try" data-action="diag-f3">Try it</button></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <details class="keys">
+        <summary>Keyboard, Soft Keys, Paste &amp; Disk Drag-and-Drop Reference</summary>
+        <table>
+          <tbody>
+            <tr>
+              <td class="cmd"><code class="k">F1</code> &ndash; <code class="k">F10</code></td>
+              <td>Maps to the 10 Hyperion soft keys aligned under Line 25 (click the on-screen buttons or press <code class="k">F1</code>&ndash;<code class="k">F10</code> on your keyboard).</td>
+            </tr>
+            <tr>
+              <td class="cmd"><code class="k">Ctrl+V</code> / <code class="k">&#8984;V</code></td>
+              <td>Paste text from your host clipboard directly into the Hyperion keyboard buffer.</td>
+            </tr>
+            <tr>
+              <td class="cmd"><code class="k">Drag &amp; Drop</code></td>
+              <td>Drop any ImageDisk (<code class="k">.IMD</code>) or raw sector (<code class="k">.IMG</code> / <code class="k">.DSK</code>) file onto the CRT screen to mount and boot it in Drive A:.</td>
+            </tr>
+            <tr>
+              <td class="cmd"><code class="k">?boot=...</code></td>
+              <td>Bookmarkable boot URLs: <a href="?boot=dos125">?boot=dos125</a>, <a href="?boot=dos211">?boot=dos211</a>, <a href="?boot=diag">?boot=diag</a>, <a href="?boot=multiplan">?boot=multiplan</a>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </details>
     </section>
   </main>
 
