@@ -211,7 +211,7 @@ static void kbd_push_code(uint8_t code) {
 /* Physical 20-bit + Register Memory Access */
 static inline uint8_t mem_read8(uint32_t addr) {
     if (addr >= REGS_BASE) {
-        return mem[addr];
+        return mem[REGS_BASE + (addr & 0x1F)];
     }
     addr &= 0xFFFFF;
     if (addr < ram_limit) {
@@ -241,7 +241,7 @@ static inline uint8_t mem_read8(uint32_t addr) {
 
 static inline void mem_write8(uint32_t addr, uint8_t val) {
     if (addr >= REGS_BASE) {
-        mem[addr] = val;
+        mem[REGS_BASE + (addr & 0x1F)] = val;
         return;
     }
     addr &= 0xFFFFF;
@@ -271,6 +271,7 @@ static inline void mem_write8(uint32_t addr, uint8_t val) {
 
 static inline uint16_t mem_read16(uint32_t addr) {
     if (addr >= REGS_BASE) {
+        addr = REGS_BASE + (addr & 0x1E);
         return (uint16_t)(mem[addr] | ((uint16_t)mem[addr + 1] << 8));
     }
     return (uint16_t)(mem_read8(addr) | ((uint16_t)mem_read8(addr + 1) << 8));
@@ -278,6 +279,7 @@ static inline uint16_t mem_read16(uint32_t addr) {
 
 static inline void mem_write16(uint32_t addr, uint16_t val) {
     if (addr >= REGS_BASE) {
+        addr = REGS_BASE + (addr & 0x1E);
         mem[addr]     = (uint8_t)(val & 0xFF);
         mem[addr + 1] = (uint8_t)(val >> 8);
         return;
@@ -881,7 +883,7 @@ static void io_write8(uint16_t port, uint8_t val) {
 /* 8086 CPU Helpers */
 #define GET_REG_ADDR(reg_id) (REGS_BASE + (i_w ? 2 * (reg_id) : ((2 * (reg_id) + ((reg_id) / 4)) & 7)))
 #define TOP_BIT              (8 * (i_w + 1))
-#define SEGREG(reg_seg, reg_ofs, op) (16 * (uint32_t)regs16[reg_seg] + (uint16_t)(op regs16[reg_ofs]))
+#define SEGREG(reg_seg, reg_ofs, op) (((16 * (uint32_t)regs16[reg_seg] + (uint16_t)(op regs16[reg_ofs]))) & 0xFFFFF)
 #define SIGN_OF(a)           (1 & ((i_w ? (int16_t)(a) : (int8_t)(a)) >> (TOP_BIT - 1)))
 #define INDEX_INC(reg_id)    (regs16[reg_id] -= (uint16_t)((2 * regs8[FLAG_DF] - 1) * (i_w + 1)))
 
