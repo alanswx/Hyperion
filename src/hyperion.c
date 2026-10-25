@@ -102,6 +102,14 @@ static uint32_t i_data0, i_data1, i_data2, scratch_uint, scratch2_uint;
 static uint32_t set_flags_type, inst_counter;
 static int32_t  op_result, scratch_int;
 
+/* CPU Execution Speed & Timing Calibration (1x = authentic 4.77 MHz 8088 -> 8,000 inst/frame) */
+static uint32_t cpu_speed_multiplier = 1;
+static uint32_t cpu_speed_ipf = 8000;
+static uint32_t irq2_interval = 8000;
+static uint32_t irq0_interval = 26364;
+static uint32_t irq2_counter = 0;
+static uint32_t irq0_counter = 0;
+
 /* Hyperion Video / CRT State */
 static uint8_t  crt_ctrl_reg = 0;   /* Memory-mapped at A000:0000 */
 static uint8_t  vram_map_reg = 0;   /* Memory-mapped at A800:0000 (0=off, 1=both, 2=B800, 3=B000) */
@@ -1099,6 +1107,8 @@ void emu_reset(int warm) {
     kbd_last_out = 0xFF;
     kbd_waiting_ack = 0;
     kbd_irq_delay = 0;
+    irq2_counter = 0;
+    irq0_counter = 0;
 }
 
 WASM_EXPORT("emu_init")
@@ -1107,7 +1117,18 @@ void emu_init(int bios_version, int ram_kb) {
     if (ram_kb >= 640) ram_limit = 0xA0000;
     else if (ram_kb <= 256) ram_limit = 0x40000;
     else ram_limit = (uint32_t)ram_kb * 1024;
+    emu_set_cpu_speed(1);
     emu_reset(0);
+}
+
+WASM_EXPORT("emu_set_cpu_speed")
+void emu_set_cpu_speed(int multiplier) {
+    if (multiplier < 1) multiplier = 1;
+    if (multiplier > 16) multiplier = 16;
+    cpu_speed_multiplier = (uint32_t)multiplier;
+    cpu_speed_ipf = 8000 * cpu_speed_multiplier;
+    irq2_interval = cpu_speed_ipf;
+    irq0_interval = (uint32_t)(cpu_speed_ipf * 3.295537f);
 }
 
 WASM_EXPORT("emu_set_rtc")
@@ -1668,13 +1689,15 @@ int emu_step(int instructions) {
             pic_request_irq(1); /* IRQ1: Keyboard */
         }
 
-        /* IRQ2: CRT Vertical Retrace (60 Hz -> 45,000 instructions per frame) */
-        if ((inst_counter % 45000) == 0) {
+        /* IRQ2: CRT Vertical Retrace (60 Hz in frame time) */
+        if (++irq2_counter >= irq2_interval) {
+            irq2_counter = 0;
             pic_request_irq(2);
         }
 
-        /* IRQ0: 8253 PIT Channel 0 Timer (18.2 Hz -> ~148,350 instructions) */
-        if ((inst_counter % 148350) == 0) {
+        /* IRQ0: 8253 PIT Channel 0 Timer (18.2 Hz in frame time) */
+        if (++irq0_counter >= irq0_interval) {
+            irq0_counter = 0;
             pic_request_irq(0);
         }
 
@@ -1908,9 +1931,9 @@ static void render_display(void) {
 
 WASM_EXPORT("emu_run_frame")
 int emu_run_frame(void) {
-    emu_step(45000);
+    emu_step((int)cpu_speed_ipf);
     render_display();
-    return 45000;
+    return (int)cpu_speed_ipf;
 }
 
 /* Disk Image Loader (Supports both ImageDisk .IMD and raw .IMG/.DSK) */

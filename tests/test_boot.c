@@ -35,6 +35,7 @@ int main(int argc, char **argv) {
     int bios_ver = (argc > 2) ? atoi(argv[2]) : 7;
 
     emu_init(bios_ver, 256);
+    emu_set_cpu_speed(6);
 
     time_t rawtime;
     time(&rawtime);

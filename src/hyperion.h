@@ -12,6 +12,7 @@ extern "C" {
 
 void emu_init(int bios_version, int ram_kb);
 void emu_reset(int warm);
+void emu_set_cpu_speed(int multiplier);
 void emu_set_rtc(int year, int month, int day, int dow, int hour, int min, int sec);
 int  emu_step(int instructions);
 int  emu_run_frame(void);

@@ -200,6 +200,7 @@
       const biosRev = parseInt(biosSelect.value, 10) || 0;
       const ramKb = parseInt(ramSelect.value, 10) || 256;
       ex.emu_init(biosRev, ramKb);
+      if (ex.emu_set_cpu_speed) ex.emu_set_cpu_speed(speedMultiplier);
       syncRtcToHost();
       teleStatus.textContent = `Cold Reset (BIOS ${biosRev === 1 ? "C1" : "C7"}, ${ramKb} KB RAM)`;
     }
@@ -250,10 +251,8 @@
 
   function renderFrame() {
     if (ex) {
-      for (let i = 0; i < speedMultiplier; i++) {
-        ex.emu_run_frame();
-      }
-      emuFramesExecuted += speedMultiplier;
+      ex.emu_run_frame();
+      emuFramesExecuted++;
 
       // Copy 640x250 RGBA framebuffer to Canvas
       const fbPtr = ex.emu_get_framebuffer();
@@ -276,9 +275,8 @@
       const elapsed = now - lastSpeedMeasureTime;
       if (elapsed >= 500) {
         const fps = (emuFramesExecuted / elapsed) * 1000;
-        const mult = fps / 60;
         if (teleSpeed) {
-          teleSpeed.textContent = `${mult.toFixed(1)}x (${Math.round(fps)} fps)`;
+          teleSpeed.textContent = `${speedMultiplier}x (${Math.round(fps)} fps)`;
         }
         emuFramesExecuted = 0;
         lastSpeedMeasureTime = now;
@@ -316,13 +314,14 @@
   function tapXtKey(xtCode) {
     if (!ex) return;
     ex.emu_xt_key_event(xtCode, 1);
-    const delay = speedMultiplier > 2 ? 30 : 60;
-    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), delay);
+    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), 40);
   }
 
-  // Event Listeners
-  crtWrap.addEventListener("keydown", (e) => {
+  // Event Listeners (Capture keyboard globally unless typing in an input/textarea)
+  window.addEventListener("keydown", (e) => {
     if (!ex) return;
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     // Allow browser paste (Ctrl+V / Cmd+V)
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
     if (e.repeat) return;
@@ -333,8 +332,10 @@
     }
   });
 
-  crtWrap.addEventListener("keyup", (e) => {
+  window.addEventListener("keyup", (e) => {
     if (!ex) return;
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
     const xt = CODE_TO_XT_SCANCODE[e.code];
     if (xt) {
@@ -430,14 +431,19 @@
   function setSpeed(val) {
     speedMultiplier = Math.max(1, parseInt(val, 10) || 1);
     if (speedSelect) speedSelect.value = String(speedMultiplier);
+    if (ex && ex.emu_set_cpu_speed) {
+      ex.emu_set_cpu_speed(speedMultiplier);
+    }
     teleStatus.textContent = speedMultiplier === 1
-      ? "Speed set to 1x (Normal)"
-      : `Speed set to ${speedMultiplier}x`;
+      ? "Speed: 1x (4.77 MHz Authentic 8088)"
+      : `Speed: ${speedMultiplier}x (${(speedMultiplier * 4.77).toFixed(1)} MHz)`;
   }
 
   if (speedSelect) {
     speedSelect.addEventListener("change", (e) => {
       setSpeed(e.target.value);
+      speedSelect.blur();
+      crtWrap.focus();
     });
   }
 

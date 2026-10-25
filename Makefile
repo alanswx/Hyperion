@@ -41,4 +41,4 @@ serve: wasm disks
 	python3 -m http.server 8080
 
 clean:
-	rm -rf build
+	rm -rf build web/hyperion.wasm
