@@ -123,6 +123,11 @@
 
   let emuFramesExecuted = 0;
   let lastSpeedMeasureTime = performance.now();
+  let lastFrameTime = performance.now();
+  let frameAccumulator = 0;
+  const TARGET_FRAME_MS = 1000 / 60; // 16.666 ms
+  let speedMultiplier = 1;
+  let speedMode = "1";
 
   let wasmMemory = null;
   let ex = null;
@@ -290,10 +295,35 @@
     }
   }
 
-  function fastForwardBoot(frames = 175) {
+  function fastForwardBoot(maxFrames = 1000) {
     if (!ex) return;
-    for (let i = 0; i < frames; i++) {
+    const vramPtr = ex.emu_get_vram();
+    const ramPtr = ex.emu_get_ram();
+    for (let i = 0; i < maxFrames; i++) {
       ex.emu_run_frame();
+      const ram = new Uint8Array(wasmMemory.buffer, ramPtr, 0x500);
+      const pageOff = ram[0x44E] | (ram[0x44F] << 8);
+      const vram = new Uint8Array(wasmMemory.buffer, vramPtr + pageOff, 4000);
+      let found = false;
+      for (let offset = 0; offset < 240 * 2; offset += 2) {
+        const b0 = vram[offset], b1 = vram[offset + 2], b2 = vram[offset + 4], b3 = vram[offset + 6];
+        if (b0 === 68 && b1 === 65 && b2 === 84 && b3 === 69) { // DATE
+          found = true;
+          break;
+        }
+        if ((b0 === 65 || b0 === 67) && b1 === 62) { // A> or C>
+          found = true;
+          break;
+        }
+        if (b0 === 72 && b1 === 121 && b2 === 112 && b3 === 101) { // Hype
+          found = true;
+          break;
+        }
+      }
+      if (found) {
+        for (let extra = 0; extra < 25; extra++) ex.emu_run_frame();
+        break;
+      }
     }
   }
 
@@ -335,8 +365,31 @@
 
   function renderFrame() {
     if (ex) {
-      ex.emu_run_frame();
-      emuFramesExecuted++;
+      const now = performance.now();
+      let delta = now - lastFrameTime;
+      if (delta > 250) delta = 250;
+      lastFrameTime = now;
+
+      if (speedMode === "max") {
+        const start = performance.now();
+        let ran = 0;
+        while (performance.now() - start < 12 && ran < 20) {
+          ex.emu_run_frame();
+          ran++;
+        }
+        emuFramesExecuted += ran;
+      } else {
+        frameAccumulator += delta;
+        let framesToRun = Math.floor(frameAccumulator / TARGET_FRAME_MS);
+        if (framesToRun > 10) framesToRun = 10;
+        if (framesToRun > 0) {
+          frameAccumulator -= framesToRun * TARGET_FRAME_MS;
+          for (let i = 0; i < framesToRun; i++) {
+            ex.emu_run_frame();
+          }
+          emuFramesExecuted += framesToRun;
+        }
+      }
 
       // Copy 640x250 RGBA framebuffer to Canvas
       const fbPtr = ex.emu_get_framebuffer();
@@ -358,12 +411,13 @@
       updateSpeakerAudio();
 
       // Measure & update speed telemetry every 500ms
-      const now = performance.now();
       const elapsed = now - lastSpeedMeasureTime;
       if (elapsed >= 500) {
         const fps = (emuFramesExecuted / elapsed) * 1000;
         if (teleSpeed) {
-          teleSpeed.textContent = `${speedMultiplier}x (${Math.round(fps)} fps)`;
+          teleSpeed.textContent = speedMode === "max"
+            ? `Max (${Math.round(fps)} fps)`
+            : `${speedMultiplier}x (${Math.round(fps)} fps, ${(speedMultiplier * 4.77).toFixed(1)} MHz)`;
         }
         emuFramesExecuted = 0;
         lastSpeedMeasureTime = now;
@@ -401,7 +455,8 @@
   function tapXtKey(xtCode) {
     if (!ex) return;
     ex.emu_xt_key_event(xtCode, 1);
-    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), 40);
+    const delay = speedMode === "max" ? 10 : Math.max(15, Math.round(40 / Math.min(speedMultiplier, 4)));
+    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), delay);
   }
 
   // Event Listeners (Capture keyboard globally unless typing in an input/textarea)
@@ -565,14 +620,21 @@
   });
 
   function setSpeed(val) {
-    speedMultiplier = Math.max(1, parseInt(val, 10) || 1);
-    if (speedSelect) speedSelect.value = String(speedMultiplier);
+    speedMode = String(val);
+    if (speedMode === "max") {
+      speedMultiplier = 16;
+      if (speedSelect) speedSelect.value = "max";
+      teleStatus.textContent = "Speed: Max (Uncapped Warp)";
+    } else {
+      speedMultiplier = Math.max(1, parseInt(val, 10) || 1);
+      if (speedSelect) speedSelect.value = String(speedMultiplier);
+      teleStatus.textContent = speedMultiplier === 1
+        ? "Speed: 1x (4.77 MHz Authentic 8088)"
+        : `Speed: ${speedMultiplier}x (${(speedMultiplier * 4.77).toFixed(1)} MHz)`;
+    }
     if (ex && ex.emu_set_cpu_speed) {
       ex.emu_set_cpu_speed(speedMultiplier);
     }
-    teleStatus.textContent = speedMultiplier === 1
-      ? "Speed: 1x (4.77 MHz Authentic 8088)"
-      : `Speed: ${speedMultiplier}x (${(speedMultiplier * 4.77).toFixed(1)} MHz)`;
   }
 
   if (speedSelect) {
@@ -627,17 +689,22 @@
       diskSelects[1].value = "HYPMSPRG.IMD";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
+      fastForwardBoot();
+      sendAsciiString("\r\r", 25);
+      teleStatus.textContent = "Booted Hyperion H-DOS 1.25H";
     } else if (presetName === "diag") {
       diskSelects[0].value = "HYPDIAG.IMD";
       await loadSelectedDisk(0);
       resetMachine(false);
+      fastForwardBoot();
+      teleStatus.textContent = "Booted Master Diagnostic Diskette";
     } else if (presetName === "multiplan") {
       diskSelects[0].value = "HYPDOS21.IMD";
       diskSelects[1].value = "MULTIPLN.IMD";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
-      fastForwardBoot(175);
-      sendAsciiString("\r\rB:\rMP\r", 35);
+      fastForwardBoot();
+      sendAsciiString("\r\rB:\rMP\r", 25);
       teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
     } else if (presetName === "hd") {
       diskSelects[0].value = "HYPDOS21.IMD";
@@ -645,8 +712,8 @@
       if (!diskSelectHd.value) diskSelectHd.value = "HYP10MB.IMG";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
-      fastForwardBoot(175);
-      sendAsciiString("\r\rC:\rDIR\r", 35);
+      fastForwardBoot();
+      sendAsciiString("\r\rC:\rDIR\r", 25);
       teleStatus.textContent = "Booted MS-DOS 2.11 into Hard Disk C:";
     } else {
       // Default: Hyperion MS-DOS 2.11 System Diskette
@@ -654,6 +721,9 @@
       diskSelects[1].value = "MULTIPLN.IMD";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
+      fastForwardBoot();
+      sendAsciiString("\r\r", 25);
+      teleStatus.textContent = "Booted Hyperion MS-DOS 2.11";
     }
     crtWrap.focus();
   }
@@ -694,7 +764,7 @@
         diskSelects[0].value = "HYPDIAG.IMD";
         await loadSelectedDisk(0);
         resetMachine(false);
-        fastForwardBoot(175);
+        fastForwardBoot();
         tapXtKey(action === "diag-f6" ? 0x40 : 0x3D);
         teleStatus.textContent = action === "diag-f6"
           ? "Running Diagnostics F6 (Dynalogic CRT Attributes)"
