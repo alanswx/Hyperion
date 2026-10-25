@@ -22,6 +22,14 @@ void emu_eject_disk(int drive);
 void emu_set_write_protect(int drive, int on);
 void emu_set_pc_keyboard_port(int on);
 
+/* Drive C: (Hard Disk) */
+int      emu_load_hd(const uint8_t *data, int len);
+void     emu_eject_hd(void);
+uint8_t* emu_create_blank_hd(int size_mb);
+uint8_t* emu_get_hd_ptr(void);
+int      emu_get_hd_size(void);
+uint8_t  emu_get_hd_led(void);
+
 void emu_key_event(int hyperion_keycode, int pressed);
 void emu_xt_key_event(int xt_scancode, int pressed);
 void emu_ascii_keypress(int ascii);

@@ -9,6 +9,8 @@ archive/
 *.bin
 !roms/*.bin
 !web/disks/*.IMD
+!web/disks/*.IMG
+!web/disks/*.img
 
 # Build artifacts
 build/

@@ -107,6 +107,13 @@
     document.getElementById("led-drive-1")
   ];
 
+  const diskSelectHd = document.getElementById("disk-select-hd");
+  const diskUploadHd = document.getElementById("disk-upload-hd");
+  const diskStatusHd = document.getElementById("disk-status-hd");
+  const ledDriveHd = document.getElementById("led-drive-hd");
+  const btnDownloadHd = document.getElementById("btn-download-hd");
+  const presetHd = document.getElementById("preset-hd");
+
   const teleCpu = document.getElementById("tele-cpu");
   const teleRegs = document.getElementById("tele-regs");
   const teleSpeed = document.getElementById("tele-speed");
@@ -191,6 +198,82 @@
     }
   }
 
+  function mountHdBytes(bytes, label) {
+    if (!ex) return;
+    const ptr = ex.emu_get_hd_ptr();
+    if (!ptr || bytes.length > 22 * 1024 * 1024) {
+      if (diskStatusHd) diskStatusHd.textContent = "Too large";
+      return;
+    }
+    new Uint8Array(wasmMemory.buffer, ptr, bytes.length).set(bytes);
+    const res = ex.emu_load_hd(ptr, bytes.length);
+    if (res === 0) {
+      const mb = (bytes.length / (1024 * 1024)).toFixed(0);
+      const cyls = bytes.length >= 20000000 ? 615 : 306;
+      if (diskStatusHd) diskStatusHd.textContent = `${mb} MB (${cyls} cyls)`;
+      teleStatus.textContent = `Mounted ${label} as Hard Disk C:`;
+    } else {
+      if (diskStatusHd) diskStatusHd.textContent = "Load error";
+    }
+  }
+
+  async function loadSelectedHd() {
+    if (!diskSelectHd || !ex) return;
+    const val = diskSelectHd.value;
+    if (!val) {
+      ex.emu_eject_hd();
+      if (diskStatusHd) diskStatusHd.textContent = "Ejected";
+      teleStatus.textContent = "Hard Disk C: ejected";
+      return;
+    }
+    if (val === "blank10") {
+      ex.emu_create_blank_hd(10);
+      if (diskStatusHd) diskStatusHd.textContent = "10 MB (306 cyls)";
+      teleStatus.textContent = "Created blank 10MB Hard Disk (ST-412)";
+      return;
+    }
+    if (val === "blank20") {
+      ex.emu_create_blank_hd(20);
+      if (diskStatusHd) diskStatusHd.textContent = "20 MB (615 cyls)";
+      teleStatus.textContent = "Created blank 20MB Hard Disk (ST-225)";
+      return;
+    }
+    if (diskStatusHd) diskStatusHd.textContent = "Loading...";
+    try {
+      const bytes = await fetchDiskImage(val);
+      mountHdBytes(bytes, val);
+    } catch (err) {
+      if (diskStatusHd) diskStatusHd.textContent = "Missing file";
+      teleStatus.textContent = err.message;
+    }
+  }
+
+  function downloadHdImage() {
+    if (!ex) return;
+    const size = ex.emu_get_hd_size();
+    if (size <= 0) {
+      teleStatus.textContent = "No Hard Disk mounted to save";
+      return;
+    }
+    const ptr = ex.emu_get_hd_ptr();
+    const data = new Uint8Array(wasmMemory.buffer, ptr, size);
+    const copy = new Uint8Array(size);
+    copy.set(data);
+    const blob = new Blob([copy], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const val = diskSelectHd ? diskSelectHd.value : "";
+    a.download = (val && val.toUpperCase().endsWith(".IMG"))
+      ? val
+      : `HYPERION_${(size / (1024 * 1024)).toFixed(0)}MB.IMG`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    teleStatus.textContent = `Saved ${a.download} (${(size / (1024 * 1024)).toFixed(1)} MB)`;
+  }
+
   function resetMachine(warm = false) {
     if (!ex) return;
     if (warm) {
@@ -264,6 +347,9 @@
       // Update Drive LEDs
       driveLeds[0].classList.toggle("on", ex.emu_get_drive_led(0) !== 0);
       driveLeds[1].classList.toggle("on", ex.emu_get_drive_led(1) !== 0);
+      if (ledDriveHd && ex.emu_get_hd_led) {
+        ledDriveHd.classList.toggle("on", ex.emu_get_hd_led() !== 0);
+      }
 
       // Update Soft Key labels from Row 24
       updateSoftKeyLabelsFromVram();
@@ -371,8 +457,25 @@
     const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
     if (!file || !ex) return;
     const bytes = new Uint8Array(await file.arrayBuffer());
-    mountDiskBytes(0, bytes, file.name);
-    resetMachine(false);
+    if (bytes.length >= 2 * 1024 * 1024) {
+      // Large raw sector image -> Mount as Hard Disk C:
+      mountHdBytes(bytes, file.name);
+      if (diskSelectHd) {
+        let opt = Array.from(diskSelectHd.options).find(o => o.value === file.name);
+        if (!opt) {
+          opt = document.createElement("option");
+          opt.value = file.name;
+          opt.textContent = `Custom: ${file.name}`;
+          diskSelectHd.insertBefore(opt, diskSelectHd.firstChild);
+        }
+        diskSelectHd.value = file.name;
+      }
+      resetMachine(false);
+    } else {
+      // Standard floppy diskette -> Mount in Drive A:
+      mountDiskBytes(0, bytes, file.name);
+      resetMachine(false);
+    }
     crtWrap.focus();
   });
 
@@ -493,11 +596,36 @@
     });
   });
 
+  if (diskSelectHd) {
+    diskSelectHd.addEventListener("change", () => loadSelectedHd());
+  }
+  if (diskUploadHd) {
+    diskUploadHd.addEventListener("change", async (e) => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const buf = new Uint8Array(await file.arrayBuffer());
+      mountHdBytes(buf, file.name);
+      if (diskSelectHd) {
+        let opt = Array.from(diskSelectHd.options).find(o => o.value === file.name);
+        if (!opt) {
+          opt = document.createElement("option");
+          opt.value = file.name;
+          opt.textContent = `Custom: ${file.name}`;
+          diskSelectHd.insertBefore(opt, diskSelectHd.firstChild);
+        }
+        diskSelectHd.value = file.name;
+      }
+    });
+  }
+  if (btnDownloadHd) {
+    btnDownloadHd.addEventListener("click", downloadHdImage);
+  }
+
   async function bootPreset(presetName) {
     if (presetName === "dos125") {
       diskSelects[0].value = "HYPMSTRU.IMD";
       diskSelects[1].value = "HYPMSPRG.IMD";
-      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
     } else if (presetName === "diag") {
       diskSelects[0].value = "HYPDIAG.IMD";
@@ -506,16 +634,25 @@
     } else if (presetName === "multiplan") {
       diskSelects[0].value = "HYPDOS21.IMD";
       diskSelects[1].value = "MULTIPLN.IMD";
-      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
       fastForwardBoot(175);
       sendAsciiString("\r\rB:\rMP\r", 35);
       teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
+    } else if (presetName === "hd") {
+      diskSelects[0].value = "HYPDOS21.IMD";
+      diskSelects[1].value = "MULTIPLN.IMD";
+      if (!diskSelectHd.value) diskSelectHd.value = "HYP10MB.IMG";
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
+      resetMachine(false);
+      fastForwardBoot(175);
+      sendAsciiString("\r\rC:\rDIR\r", 35);
+      teleStatus.textContent = "Booted MS-DOS 2.11 into Hard Disk C:";
     } else {
       // Default: Hyperion MS-DOS 2.11 System Diskette
       diskSelects[0].value = "HYPDOS21.IMD";
       diskSelects[1].value = "MULTIPLN.IMD";
-      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
     }
     crtWrap.focus();
@@ -523,6 +660,9 @@
 
   document.getElementById("preset-dos125").addEventListener("click", () => bootPreset("dos125"));
   document.getElementById("preset-dos211").addEventListener("click", () => bootPreset("dos211"));
+  if (presetHd) {
+    presetHd.addEventListener("click", () => bootPreset("hd"));
+  }
   document.getElementById("preset-diag").addEventListener("click", () => bootPreset("diag"));
   document.getElementById("macro-multiplan").addEventListener("click", async () => {
     if (diskSelects[1].value !== "MULTIPLN.IMD") {
@@ -577,7 +717,7 @@
   // Boot Wasm Emulator
   async function initEmulator() {
     try {
-      wasmMemory = new WebAssembly.Memory({ initial: 128 });
+      wasmMemory = new WebAssembly.Memory({ initial: 512, maximum: 1024 });
       const stackPtr = new WebAssembly.Global({ value: "i32", mutable: true }, 6 * 1024 * 1024);
       const fnTable = new WebAssembly.Table({ initial: 0, element: "anyfunc" });
 

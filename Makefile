@@ -17,7 +17,7 @@ wasm: web/hyperion.wasm
 
 web: wasm disks
 
-web/hyperion.wasm: src/hyperion.c src/hyperion.h src/decode_tables.h src/roms.h
+web/hyperion.wasm: src/hyperion.c src/hyperion.h src/decode_tables.h src/roms.h src/hd_rom.h
 	@mkdir -p web
 	$(WASM_CC) --target=wasm32 -O3 -c src/hyperion.c -o web/hyperion.wasm
 	@ls -lh web/hyperion.wasm
@@ -35,6 +35,8 @@ test: wasm
 	@mkdir -p build
 	$(HOST_CC) $(CFLAGS) src/hyperion.c tests/test_boot.c -o build/test_boot
 	./build/test_boot web/disks/HYPDOS21.IMD
+	$(HOST_CC) $(CFLAGS) src/hyperion.c tests/test_hd.c -o build/test_hd
+	./build/test_hd
 
 serve: wasm disks
 	@echo "Serving Hyperion WebAssembly Emulator at http://localhost:8080/web/"

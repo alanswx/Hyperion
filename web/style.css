@@ -454,6 +454,37 @@ select, input[type="text"] {
   border-radius: 2px;
 }
 
+.hd-unit {
+  border-color: #4a3e2a;
+  background: #1c1a17;
+}
+
+.hd-slot {
+  height: 18px;
+  background: #121110;
+  border-color: #38342e;
+}
+
+.hd-faceplate {
+  width: 88%;
+  height: 6px;
+  background: repeating-linear-gradient(
+    90deg,
+    #0c0b0a,
+    #0c0b0a 4px,
+    #25221d 4px,
+    #25221d 7px
+  );
+  border-radius: 2px;
+  border: 1px solid #1a1815;
+}
+
+.drive-led.hd-led {
+  border-radius: 2px;
+  width: 13px;
+  height: 9px;
+}
+
 .disk-select {
   width: 100%;
 }

@@ -8,6 +8,12 @@
 #include "hyperion.h"
 #include "decode_tables.h"
 #include "roms.h"
+#include "hd_rom.h"
+
+#ifndef __wasm__
+#include <stdlib.h>
+#include <stdio.h>
+#endif
 
 #ifdef __wasm__
 #define WASM_EXPORT(name) __attribute__((export_name(name)))
@@ -86,6 +92,21 @@ static uint8_t  vram[VRAM_SIZE]; /* 20 KB CRT Display RAM */
 static uint32_t framebuffer[HYPERION_SCREEN_WIDTH * HYPERION_SCREEN_HEIGHT];
 static uint8_t  disk_upload_buf[UPLOAD_BUF_SIZE];
 #endif
+
+/* Drive C: (Hard Disk) State */
+#define HD_MAX_SIZE (22 * 1024 * 1024)
+#ifdef __wasm__
+#define hd_data ((uint8_t *)0x800000)
+#else
+static uint8_t *hd_data = NULL;
+#endif
+static int      hd_mounted = 0;
+static uint32_t hd_size = 0;
+static uint16_t hd_cyls = 306;
+static uint8_t  hd_heads = 4;
+static uint8_t  hd_spt = 17;
+static uint8_t  hd_led_timer = 0;
+static uint8_t  hd_last_status = 0;
 
 static const uint8_t *active_bios_rom = hyperion_bios_c7_rom;
 static uint32_t ram_limit = 0x40000; /* Default 256 KB (or 0xA0000 for 640 KB) */
@@ -241,6 +262,11 @@ static inline uint8_t mem_read8(uint32_t addr) {
             return vram[addr - 0xB8000];
         return 0xFF;
     }
+    if (addr >= 0xC8000 && addr < 0xC8800) {
+        if (hd_mounted)
+            return hd_option_rom[addr - 0xC8000];
+        return 0xFF;
+    }
     if (addr >= 0xFE000) {
         return active_bios_rom[addr - 0xFE000];
     }
@@ -273,6 +299,11 @@ static inline void mem_write8(uint32_t addr, uint8_t val) {
     if (addr >= 0xB8000 && addr < 0xBD000) {
         if (vram_map_reg == 1 || vram_map_reg == 2)
             vram[addr - 0xB8000] = val;
+        return;
+    }
+    if (addr >= 0xC8000 && addr < 0xC8800) {
+        if (hd_mounted)
+            hd_option_rom[addr - 0xC8000] = val;
         return;
     }
 }
@@ -542,6 +573,168 @@ static void fdc_execute_command(void) {
     }
 }
 
+/* Fixed Disk Controller INT 13h Trap Handler (Port 0xC2) */
+static void handle_hd_trap(uint8_t dummy) {
+    (void)dummy;
+    uint8_t cmd = regs8[REG_AH];
+    uint8_t count = regs8[REG_AL];
+    uint8_t cyl_lo = regs8[REG_CH];
+    uint8_t sec_cyl = regs8[REG_CL];
+    uint8_t head = regs8[REG_DH];
+    uint8_t drive = regs8[REG_DL];
+    uint16_t cyl = (uint16_t)cyl_lo | ((uint16_t)(sec_cyl & 0xC0) << 2);
+    uint8_t sec = sec_cyl & 0x3F;
+
+    uint32_t flags_addr = (16 * (uint32_t)regs16[REG_SS] + (uint16_t)(regs16[REG_SP] + 4)) & 0xFFFFF;
+    uint16_t fl = mem_read16(flags_addr);
+
+    if (drive != 0x80 || !hd_mounted || !hd_data) {
+        regs8[REG_AH] = 0x01; /* Invalid drive */
+        fl |= 1; /* CF = 1 */
+        mem_write16(flags_addr, fl);
+        return;
+    }
+
+    hd_led_timer = 20;
+
+    switch (cmd) {
+        case 0x00: /* Reset Disk System */
+        case 0x09: /* Initialize Drive Pair */
+        case 0x0D: /* Alternate Reset */
+        case 0x10: /* Test Drive Ready */
+        case 0x11: /* Recalibrate */
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+
+        case 0x01: /* Get Last Status */
+            regs8[REG_AL] = hd_last_status;
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+
+        case 0x02: /* Read Sectors */ {
+            if (sec < 1 || sec > hd_spt || head >= hd_heads || cyl >= hd_cyls) {
+                regs8[REG_AH] = 0x04; /* Sector Not Found */
+                fl |= 1;
+                break;
+            }
+            uint32_t lba = (((uint32_t)cyl * hd_heads + head) * hd_spt) + (sec - 1);
+            uint32_t base_dest = (16 * (uint32_t)regs16[REG_ES] + regs16[REG_BX]) & 0xFFFFF;
+            uint32_t sectors_read = 0;
+            for (uint8_t s = 0; s < count; s++) {
+                if (lba * 512 + 512 > hd_size) {
+                    regs8[REG_AH] = 0x04;
+                    fl |= 1;
+                    break;
+                }
+                const uint8_t *src_sec = &hd_data[lba * 512];
+                for (int b = 0; b < 512; b++) {
+                    mem_write8((base_dest + s * 512 + b) & 0xFFFFF, src_sec[b]);
+                }
+                lba++;
+                sectors_read++;
+            }
+            regs8[REG_AL] = (uint8_t)sectors_read;
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+        }
+
+        case 0x03: /* Write Sectors */ {
+            if (sec < 1 || sec > hd_spt || head >= hd_heads || cyl >= hd_cyls) {
+                regs8[REG_AH] = 0x04;
+                fl |= 1;
+                break;
+            }
+            uint32_t lba = (((uint32_t)cyl * hd_heads + head) * hd_spt) + (sec - 1);
+            uint32_t base_src = (16 * (uint32_t)regs16[REG_ES] + regs16[REG_BX]) & 0xFFFFF;
+            uint32_t sectors_written = 0;
+            for (uint8_t s = 0; s < count; s++) {
+                if (lba * 512 + 512 > hd_size) {
+                    regs8[REG_AH] = 0x04;
+                    fl |= 1;
+                    break;
+                }
+                uint8_t *dst_sec = &hd_data[lba * 512];
+                for (int b = 0; b < 512; b++) {
+                    dst_sec[b] = mem_read8((base_src + s * 512 + b) & 0xFFFFF);
+                }
+                lba++;
+                sectors_written++;
+            }
+            regs8[REG_AL] = (uint8_t)sectors_written;
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+        }
+
+        case 0x04: /* Verify Sectors */ {
+            if (sec < 1 || sec > hd_spt || head >= hd_heads || cyl >= hd_cyls) {
+                regs8[REG_AH] = 0x04;
+                fl |= 1;
+                break;
+            }
+            regs8[REG_AL] = count;
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+        }
+
+        case 0x05: /* Format Track */
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+
+        case 0x08: /* Get Drive Parameters */
+            regs8[REG_DL] = 1;
+            regs8[REG_DH] = (uint8_t)(hd_heads - 1);
+            regs8[REG_CH] = (uint8_t)((hd_cyls - 1) & 0xFF);
+            regs8[REG_CL] = (uint8_t)((((hd_cyls - 1) >> 2) & 0xC0) | (hd_spt & 0x3F));
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+
+        case 0x0C: /* Seek Cylinder */
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+
+        case 0x15: /* Get Disk Type */
+            regs8[REG_AH] = 0x03; /* Fixed disk */
+            {
+                uint32_t total_sec = hd_size / 512;
+                regs16[REG_CX] = (uint16_t)(total_sec >> 16);
+                regs16[REG_DX] = (uint16_t)(total_sec & 0xFFFF);
+            }
+            fl &= ~1;
+            break;
+
+        default:
+            regs8[REG_AH] = 0x00;
+            fl &= ~1;
+            break;
+    }
+
+    hd_last_status = regs8[REG_AH];
+    mem_write16(flags_addr, fl);
+}
+
+static void hd_update_rom(void) {
+    hd_option_rom[0x110] = (uint8_t)(hd_cyls & 0xFF);
+    hd_option_rom[0x111] = (uint8_t)(hd_cyls >> 8);
+    hd_option_rom[0x112] = hd_heads;
+    hd_option_rom[0x11C] = (uint8_t)(hd_cyls & 0xFF);
+    hd_option_rom[0x11D] = (uint8_t)(hd_cyls >> 8);
+    hd_option_rom[0x11E] = hd_spt;
+
+    uint8_t sum = 0;
+    for (int i = 0; i < 2047; i++) {
+        sum += hd_option_rom[i];
+    }
+    hd_option_rom[2047] = (uint8_t)(256 - sum);
+}
+
 /* I/O Port Read & Write */
 static uint8_t io_read8(uint16_t port) {
     /* 8237A DMAC (0x00 - 0x0F) */
@@ -612,6 +805,9 @@ static uint8_t io_read8(uint16_t port) {
         }
         return 0x00;
     }
+
+    /* Fixed Disk INT 13h Status (Port 0xC2) */
+    if (port == 0xC2) return hd_last_status;
 
     /* System Control Register (0xC8) */
     if (port == 0xC8) return port_c8;
@@ -795,6 +991,12 @@ static void io_write8(uint16_t port, uint8_t val) {
             fdc_execute_command();
             fdc_cmd_len = 0;
         }
+        return;
+    }
+
+    /* Fixed Disk INT 13h Trap (Port 0xC2) */
+    if (port == 0xC2) {
+        handle_hd_trap(val);
         return;
     }
 
@@ -1109,6 +1311,8 @@ void emu_reset(int warm) {
     kbd_irq_delay = 0;
     irq2_counter = 0;
     irq0_counter = 0;
+    hd_led_timer = 0;
+    hd_last_status = 0;
 }
 
 WASM_EXPORT("emu_init")
@@ -1741,6 +1945,7 @@ static void render_display(void) {
     for (int d = 0; d < FDC_MAX_DRIVES; d++) {
         if (drive_led_timer[d] > 0) drive_led_timer[d]--;
     }
+    if (hd_led_timer > 0) hd_led_timer--;
 
     uint8_t mode = mem[0x449]; /* BDA 0040:0049 current video mode */
 
@@ -2044,6 +2249,63 @@ void emu_eject_disk(int drive) {
     if (drive >= 0 && drive < FDC_MAX_DRIVES) {
         floppy_mounted[drive] = 0;
     }
+}
+
+/* Drive C: (Hard Disk) Exports */
+WASM_EXPORT("emu_load_hd")
+int emu_load_hd(const uint8_t *data, int len) {
+    if (!data || len <= 0 || len > HD_MAX_SIZE) return -1;
+#ifndef __wasm__
+    if (!hd_data) hd_data = (uint8_t *)malloc(HD_MAX_SIZE);
+#endif
+    if (len >= 20000000) {
+        hd_cyls = 615; hd_heads = 4; hd_spt = 17;
+    } else {
+        hd_cyls = 306; hd_heads = 4; hd_spt = 17;
+    }
+    hd_size = len;
+    for (int i = 0; i < len; i++) hd_data[i] = data[i];
+    hd_mounted = 1;
+    hd_update_rom();
+    return 0;
+}
+
+WASM_EXPORT("emu_eject_hd")
+void emu_eject_hd(void) {
+    hd_mounted = 0;
+}
+
+WASM_EXPORT("emu_create_blank_hd")
+uint8_t* emu_create_blank_hd(int size_mb) {
+#ifndef __wasm__
+    if (!hd_data) hd_data = (uint8_t *)malloc(HD_MAX_SIZE);
+#endif
+    if (size_mb == 20) {
+        hd_cyls = 615; hd_heads = 4; hd_spt = 17;
+        hd_size = 615 * 4 * 17 * 512;
+    } else {
+        hd_cyls = 306; hd_heads = 4; hd_spt = 17;
+        hd_size = 306 * 4 * 17 * 512;
+    }
+    for (uint32_t i = 0; i < hd_size; i++) hd_data[i] = 0;
+    hd_mounted = 1;
+    hd_update_rom();
+    return hd_data;
+}
+
+WASM_EXPORT("emu_get_hd_ptr")
+uint8_t* emu_get_hd_ptr(void) {
+    return hd_data;
+}
+
+WASM_EXPORT("emu_get_hd_size")
+int emu_get_hd_size(void) {
+    return (int)hd_size;
+}
+
+WASM_EXPORT("emu_get_hd_led")
+uint8_t emu_get_hd_led(void) {
+    return (hd_led_timer > 0) ? 1 : 0;
 }
 
 /* Keyboard Input: Hyperion native keycode, IBM XT scancode, or direct ASCII */

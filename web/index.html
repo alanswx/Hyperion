@@ -156,11 +156,37 @@
             </div>
           </div>
 
+          <!-- Drive C: (Fixed Disk / Expansion Unit) -->
+          <div class="floppy-unit hd-unit">
+            <div class="floppy-header">
+              <span class="drive-title">DRIVE C: <small>(10MB / 20MB Hard Disk)</small></span>
+              <span class="drive-led hd-led" id="led-drive-hd" title="Drive C: Fixed Disk Activity LED"></span>
+            </div>
+            <div class="floppy-slot hd-slot">
+              <div class="slot-opening hd-faceplate"></div>
+            </div>
+            <select id="disk-select-hd" class="disk-select" aria-label="Drive C Hard Disk Image">
+              <option value="HYP10MB.IMG" selected>Hyperion 10MB Hard Disk (Pre-installed)</option>
+              <option value="blank10">Blank 10MB Hard Disk (ST-412)</option>
+              <option value="blank20">Blank 20MB Hard Disk (ST-225)</option>
+              <option value="">-- Ejected --</option>
+            </select>
+            <div class="drive-actions">
+              <label class="btn btn-sm file-btn">
+                Load .IMG
+                <input type="file" id="disk-upload-hd" accept=".img,.IMG,.raw,.RAW,.bin,.BIN" hidden>
+              </label>
+              <button type="button" class="btn btn-sm" id="btn-download-hd" title="Download current Hard Disk image">Save .IMG</button>
+              <span class="disk-status" id="disk-status-hd">10 MB (306 cyls)</span>
+            </div>
+          </div>
+
           <!-- Quick Presets & Type-In Helper -->
           <div class="quick-panel">
             <h3>Quick Presets &amp; Macros</h3>
             <div class="preset-grid">
               <button class="btn btn-sm btn-amber" id="preset-dos211">Boot MS-DOS 2.11</button>
+              <button class="btn btn-sm" id="preset-hd">Boot Hard Disk (C:)</button>
               <button class="btn btn-sm" id="preset-dos125">Boot H-DOS 1.25H</button>
               <button class="btn btn-sm" id="preset-diag">Boot Diagnostics</button>
               <button class="btn btn-sm" id="macro-multiplan">Run Multiplan (B:MP)</button>
@@ -217,9 +243,19 @@
             <td class="cmd"><button type="button" class="try" data-action="multiplan">Try it</button></td>
           </tr>
           <tr>
+            <td class="cmd"><code class="k">DIR C:</code></td>
+            <td>Inspect <b>Drive C: (10MB Hard Disk)</b> with pre-installed MS-DOS utilities and 10+ MB storage.</td>
+            <td class="cmd"><button type="button" class="try" data-cmd="DIR C:">Try it</button></td>
+          </tr>
+          <tr>
+            <td class="cmd"><code class="k">FDISK</code></td>
+            <td>Run the authentic <b>Hyperion Hard Disk Support Utility (FDISK.EXE)</b> to configure or partition Drive C:.</td>
+            <td class="cmd"><button type="button" class="try" data-cmd="FDISK">Try it</button></td>
+          </tr>
+          <tr>
             <td class="cmd"><code class="k">DISKNAME</code></td>
             <td>Inspect the Hyperion diskette volume names mounted in <b>Drive A:</b> and <b>Drive B:</b>.</td>
-            <td class="cmd"><button type="button" class="try" data-cmd="C:DISKNAME">Try it</button></td>
+            <td class="cmd"><button type="button" class="try" data-cmd="DISKNAME">Try it</button></td>
           </tr>
           <tr>
             <td class="cmd"><code class="k">DIR A:</code></td>
@@ -228,8 +264,8 @@
           </tr>
           <tr>
             <td class="cmd"><code class="k">CHKDSK C:</code></td>
-            <td>Check the <b>90 KB Electronic RAM Disk (C:)</b> automatically created in the upper 96 KB of the 256 KB RAM.</td>
-            <td class="cmd"><button type="button" class="try" data-cmd="C:CHKDSK C:">Try it</button></td>
+            <td>Check the <b>Hard Disk (C:)</b> status, cluster allocation, and free disk space (or MS-DOS 1.25H RAM disk).</td>
+            <td class="cmd"><button type="button" class="try" data-cmd="CHKDSK C:">Try it</button></td>
           </tr>
           <tr>
             <td class="cmd"><code class="k">Diagnostics &bull; F6</code></td>
