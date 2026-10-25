@@ -94,7 +94,6 @@
     document.getElementById("disk-wp-1")
   ];
   const speedSelect = document.getElementById("speed-select");
-  let speedMode = "1";
   let speedMultiplier = 1;
   const btnPcKbd = document.getElementById("btn-pc-kbd");
   let pcKbdPort = false;
@@ -251,22 +250,10 @@
 
   function renderFrame() {
     if (ex) {
-      if (speedMode === "max") {
-        const start = performance.now();
-        let count = 0;
-        // Allocate up to 12ms per animation frame (~75% of 16.6ms budget)
-        // Cap at 60 frames per rAF to avoid runaway loops
-        while (performance.now() - start < 12 && count < 60) {
-          ex.emu_run_frame();
-          count++;
-        }
-        emuFramesExecuted += count;
-      } else {
-        for (let i = 0; i < speedMultiplier; i++) {
-          ex.emu_run_frame();
-        }
-        emuFramesExecuted += speedMultiplier;
+      for (let i = 0; i < speedMultiplier; i++) {
+        ex.emu_run_frame();
       }
+      emuFramesExecuted += speedMultiplier;
 
       // Copy 640x250 RGBA framebuffer to Canvas
       const fbPtr = ex.emu_get_framebuffer();
@@ -329,7 +316,7 @@
   function tapXtKey(xtCode) {
     if (!ex) return;
     ex.emu_xt_key_event(xtCode, 1);
-    const delay = speedMode === "max" ? 10 : (speedMultiplier > 2 ? 20 : 60);
+    const delay = speedMultiplier > 2 ? 30 : 60;
     setTimeout(() => ex.emu_xt_key_event(xtCode, 0), delay);
   }
 
@@ -441,16 +428,11 @@
   });
 
   function setSpeed(val) {
-    speedMode = val;
-    if (val === "max") {
-      speedMultiplier = 1;
-      if (speedSelect) speedSelect.value = "max";
-      teleStatus.textContent = "Speed set to Max (Uncapped / Warp)";
-    } else {
-      speedMultiplier = Math.max(1, parseInt(val, 10) || 1);
-      if (speedSelect) speedSelect.value = String(speedMultiplier);
-      teleStatus.textContent = `Speed set to ${speedMultiplier}x (${(speedMultiplier * 4.77).toFixed(1)} MHz)`;
-    }
+    speedMultiplier = Math.max(1, parseInt(val, 10) || 1);
+    if (speedSelect) speedSelect.value = String(speedMultiplier);
+    teleStatus.textContent = speedMultiplier === 1
+      ? "Speed set to 1x (Normal)"
+      : `Speed set to ${speedMultiplier}x`;
   }
 
   if (speedSelect) {
