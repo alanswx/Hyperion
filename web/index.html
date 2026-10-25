@@ -31,6 +31,17 @@
           <option value="640">640 KB (Expanded)</option>
         </select>
       </div>
+      <div class="ctrl-group">
+        <label for="speed-select">Speed</label>
+        <select id="speed-select" title="Emulation execution speed multiplier">
+          <option value="1" selected>1x (4.77 MHz Authentic)</option>
+          <option value="2">2x (9.5 MHz)</option>
+          <option value="4">4x (19 MHz Turbo)</option>
+          <option value="8">8x (38 MHz Turbo)</option>
+          <option value="16">16x (76 MHz Turbo)</option>
+          <option value="max">Max (As Fast As Possible)</option>
+        </select>
+      </div>
       <button id="btn-warm-boot" class="btn" title="Send Ctrl+Alt+Del warm reboot">Ctrl+Alt+Del</button>
       <button id="btn-cold-reset" class="btn btn-amber" title="Cold power-cycle reset">Cold Reset</button>
       <button id="btn-audio" class="btn" aria-pressed="false" title="Toggle WebAudio 8253 PIT PC Speaker">Speaker: Off</button>
@@ -175,6 +186,10 @@
         <span class="tele-val" id="tele-regs">AX:0000 BX:0000 CX:0000 DX:0000</span>
       </div>
       <div class="tele-item">
+        <span class="tele-label">SPEED</span>
+        <span class="tele-val" id="tele-speed">1.0x (60 fps)</span>
+      </div>
+      <div class="tele-item">
         <span class="tele-label">VIDEO MODE</span>
         <span class="tele-val" id="tele-video">82h (80&times;25 Hyperion Text)</span>
       </div>
@@ -247,8 +262,8 @@
               <td>Drop any ImageDisk (<code class="k">.IMD</code>) or raw sector (<code class="k">.IMG</code> / <code class="k">.DSK</code>) file onto the CRT screen to mount and boot it in Drive A:.</td>
             </tr>
             <tr>
-              <td class="cmd"><code class="k">?boot=...</code></td>
-              <td>Bookmarkable boot URLs: <a href="?boot=dos125">?boot=dos125</a>, <a href="?boot=dos211">?boot=dos211</a>, <a href="?boot=diag">?boot=diag</a>, <a href="?boot=multiplan">?boot=multiplan</a>.</td>
+              <td class="cmd"><code class="k">?boot=...&amp;speed=...</code></td>
+              <td>Bookmarkable URLs: <a href="?boot=dos211">?boot=dos211</a>, <a href="?boot=dos125">?boot=dos125</a>, <a href="?boot=multiplan&speed=max">?boot=multiplan&amp;speed=max</a>, <a href="?speed=max">?speed=max</a>.</td>
             </tr>
           </tbody>
         </table>

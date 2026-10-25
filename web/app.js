@@ -93,6 +93,9 @@
     document.getElementById("disk-wp-0"),
     document.getElementById("disk-wp-1")
   ];
+  const speedSelect = document.getElementById("speed-select");
+  let speedMode = "1";
+  let speedMultiplier = 1;
   const btnPcKbd = document.getElementById("btn-pc-kbd");
   let pcKbdPort = false;
   const diskStatuses = [
@@ -106,9 +109,13 @@
 
   const teleCpu = document.getElementById("tele-cpu");
   const teleRegs = document.getElementById("tele-regs");
+  const teleSpeed = document.getElementById("tele-speed");
   const teleVideo = document.getElementById("tele-video");
   const teleVmap = document.getElementById("tele-vmap");
   const teleStatus = document.getElementById("tele-status");
+
+  let emuFramesExecuted = 0;
+  let lastSpeedMeasureTime = performance.now();
 
   let wasmMemory = null;
   let ex = null;
@@ -244,7 +251,22 @@
 
   function renderFrame() {
     if (ex) {
-      ex.emu_run_frame();
+      if (speedMode === "max") {
+        const start = performance.now();
+        let count = 0;
+        // Allocate up to 12ms per animation frame (~75% of 16.6ms budget)
+        // Cap at 60 frames per rAF to avoid runaway loops
+        while (performance.now() - start < 12 && count < 60) {
+          ex.emu_run_frame();
+          count++;
+        }
+        emuFramesExecuted += count;
+      } else {
+        for (let i = 0; i < speedMultiplier; i++) {
+          ex.emu_run_frame();
+        }
+        emuFramesExecuted += speedMultiplier;
+      }
 
       // Copy 640x250 RGBA framebuffer to Canvas
       const fbPtr = ex.emu_get_framebuffer();
@@ -261,6 +283,19 @@
 
       // Update PC Speaker
       updateSpeakerAudio();
+
+      // Measure & update speed telemetry every 500ms
+      const now = performance.now();
+      const elapsed = now - lastSpeedMeasureTime;
+      if (elapsed >= 500) {
+        const fps = (emuFramesExecuted / elapsed) * 1000;
+        const mult = fps / 60;
+        if (teleSpeed) {
+          teleSpeed.textContent = `${mult.toFixed(1)}x (${Math.round(fps)} fps)`;
+        }
+        emuFramesExecuted = 0;
+        lastSpeedMeasureTime = now;
+      }
 
       // Update Telemetry
       const cs = hex16(ex.emu_get_reg(9));
@@ -294,7 +329,8 @@
   function tapXtKey(xtCode) {
     if (!ex) return;
     ex.emu_xt_key_event(xtCode, 1);
-    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), 60);
+    const delay = speedMode === "max" ? 10 : (speedMultiplier > 2 ? 20 : 60);
+    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), delay);
   }
 
   // Event Listeners
@@ -403,6 +439,25 @@
       ? "PC keyboard port 60h on (reset if a PC game's keyboard is already stuck)"
       : "PC keyboard port 60h off";
   });
+
+  function setSpeed(val) {
+    speedMode = val;
+    if (val === "max") {
+      speedMultiplier = 1;
+      if (speedSelect) speedSelect.value = "max";
+      teleStatus.textContent = "Speed set to Max (Uncapped / Warp)";
+    } else {
+      speedMultiplier = Math.max(1, parseInt(val, 10) || 1);
+      if (speedSelect) speedSelect.value = String(speedMultiplier);
+      teleStatus.textContent = `Speed set to ${speedMultiplier}x (${(speedMultiplier * 4.77).toFixed(1)} MHz)`;
+    }
+  }
+
+  if (speedSelect) {
+    speedSelect.addEventListener("change", (e) => {
+      setSpeed(e.target.value);
+    });
+  }
 
   [0, 1].forEach((drive) => {
     diskWps[drive].addEventListener("change", () => {
@@ -516,7 +571,10 @@
       });
 
       ex = instance.exports;
-      const bootParam = new URLSearchParams(window.location.search).get("boot");
+      const urlParams = new URLSearchParams(window.location.search);
+      const speedParam = urlParams.get("speed");
+      if (speedParam) setSpeed(speedParam);
+      const bootParam = urlParams.get("boot");
       await bootPreset(bootParam || "dos211");
       teleStatus.textContent = "Running (Click CRT to focus keyboard)";
       requestAnimationFrame(renderFrame);
