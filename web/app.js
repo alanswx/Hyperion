@@ -89,6 +89,12 @@
     document.getElementById("disk-upload-0"),
     document.getElementById("disk-upload-1")
   ];
+  const diskWps = [
+    document.getElementById("disk-wp-0"),
+    document.getElementById("disk-wp-1")
+  ];
+  const btnPcKbd = document.getElementById("btn-pc-kbd");
+  let pcKbdPort = false;
   const diskStatuses = [
     document.getElementById("disk-status-0"),
     document.getElementById("disk-status-1")
@@ -114,9 +120,8 @@
   function syncRtcToHost() {
     if (!ex) return;
     const now = new Date();
-    // Use 1983 with current month/day/hour/minute/second for authentic 1983 MS-DOS 1.25H boot
     ex.emu_set_rtc(
-      1983,
+      now.getFullYear(),
       now.getMonth() + 1,
       now.getDate(),
       now.getDay(),
@@ -387,7 +392,21 @@
     btnAudio.setAttribute("aria-pressed", String(audioEnabled));
   });
 
+  btnPcKbd.addEventListener("click", () => {
+    pcKbdPort = !pcKbdPort;
+    if (ex) ex.emu_set_pc_keyboard_port(pcKbdPort ? 1 : 0);
+    btnPcKbd.textContent = `PC Kbd 60h: ${pcKbdPort ? "On" : "Off"}`;
+    btnPcKbd.classList.toggle("active", pcKbdPort);
+    btnPcKbd.setAttribute("aria-pressed", String(pcKbdPort));
+    teleStatus.textContent = pcKbdPort
+      ? "PC keyboard port 60h on (reset if a PC game's keyboard is already stuck)"
+      : "PC keyboard port 60h off";
+  });
+
   [0, 1].forEach((drive) => {
+    diskWps[drive].addEventListener("change", () => {
+      if (ex) ex.emu_set_write_protect(drive, diskWps[drive].checked ? 1 : 0);
+    });
     diskSelects[drive].addEventListener("change", () => loadSelectedDisk(drive));
     diskUploads[drive].addEventListener("change", async (e) => {
       const file = e.target.files[0];
@@ -398,9 +417,9 @@
   });
 
   async function bootPreset(presetName) {
-    if (presetName === "dos211") {
-      diskSelects[0].value = "HYPDOS21.IMD";
-      diskSelects[1].value = "MULTIPLN.IMD";
+    if (presetName === "dos125") {
+      diskSelects[0].value = "HYPMSTRU.IMD";
+      diskSelects[1].value = "HYPMSPRG.IMD";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
       resetMachine(false);
     } else if (presetName === "diag") {
@@ -408,15 +427,16 @@
       await loadSelectedDisk(0);
       resetMachine(false);
     } else if (presetName === "multiplan") {
-      diskSelects[0].value = "HYPMSTRU.IMD";
+      diskSelects[0].value = "HYPDOS21.IMD";
       diskSelects[1].value = "MULTIPLN.IMD";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
       resetMachine(false);
       fastForwardBoot(175);
-      sendAsciiString("B:\rMP\r", 35);
+      sendAsciiString("\r\rB:\rMP\r", 35);
       teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
     } else {
-      diskSelects[0].value = "HYPMSTRU.IMD";
+      // Default: Hyperion MS-DOS 2.11 System Diskette
+      diskSelects[0].value = "HYPDOS21.IMD";
       diskSelects[1].value = "MULTIPLN.IMD";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1)]);
       resetMachine(false);
@@ -496,7 +516,7 @@
 
       ex = instance.exports;
       const bootParam = new URLSearchParams(window.location.search).get("boot");
-      await bootPreset(bootParam || "dos125");
+      await bootPreset(bootParam || "dos211");
       teleStatus.textContent = "Running (Click CRT to focus keyboard)";
       requestAnimationFrame(renderFrame);
     } catch (err) {

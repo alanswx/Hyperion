@@ -24,6 +24,24 @@ The CPU instruction engine is adapted from **8086tiny** (MIT License) with its 8
 | **8255 PPI + Oki MSM5832 RTC** | Ports `0140h–0143h` | Battery-backed Real-Time Clock bridged via 8255 PPI Ports A & C (used by `DATE` and `CLOCK.SYS` on H-DOS 1.25H / 2.11) |
 | **8259A PIC, 8253 PIT, 8237A DMAC, Z80-SIO** | Ports `0000h–0043h`, `0080h–0083h`, `0100h–0103h` | Interrupt controller (`IRQ0` 18.2 Hz timer, `IRQ1` keyboard, `IRQ2` 60 Hz CRT vertical retrace, `IRQ6` FDC), DMA controller, PC speaker, and serial communications |
 
+### Options (not Hyperion hardware, or physical switches)
+
+- **Write-protect tab** (`WP` checkbox per drive, `emu_set_write_protect`): Sense Drive Status reports it and writes
+  are refused. Infocom booters (Zork I-III, Starcross) refuse to run on a writable disk.
+- **PC keyboard port 60h** (`PC Kbd 60h` button, `emu_set_pc_keyboard_port`): IBM PC programs that install their own
+  INT 9 handler (Shamus) read the PC's port 60h and acknowledge through port 61h bit 7, which the Hyperion does not
+  have; without this their keyboard stops after the first key. Turn it on before starting the program (a reset
+  clears a stuck keyboard).
+
+### Disks
+
+Each drive has a list of the bundled Hyperion disks (`web/disks/`) and a **Load .IMD / .IMG** button for your own
+images (ImageDisk or raw 160/180/320/360 KB); dropping a file on the screen mounts it in Drive A: and reboots.
+
+The companion MiSTer FPGA core, which uses this emulator as its reference, is
+[Hyperion_MiSTer](https://github.com/alanswx/Hyperion_MiSTer); its `docs/software-tests.md` lists the 1983-84 PC
+software tried on both.
+
 ---
 
 ## Quick Start
@@ -40,7 +58,7 @@ Then open **[http://localhost:8080/web/](http://localhost:8080/web/)** in your b
 
 ### 2. Rebuild WebAssembly Module (`web/hyperion.wasm`)
 
-The entire emulator core + embedded BIOS and character ROMs compiles to a standalone **73 KB** WebAssembly binary (`web/hyperion.wasm`) with zero external runtime dependencies:
+The entire emulator core + embedded BIOS and character ROMs compiles to a standalone **74 KB** WebAssembly binary (`web/hyperion.wasm`) with zero external runtime dependencies:
 
 ```bash
 make wasm
@@ -73,7 +91,7 @@ make test
 │   ├── index.html          # Hyperion CRT, F1-F10 soft keys, and dual floppy UI
 │   ├── style.css           # Dynalogic Hyperion molded case & amber phosphor styling
 │   ├── app.js              # WebAssembly loader, keyboard/audio/disk controller
-│   └── hyperion.wasm       # Compiled 73 KB WebAssembly module
+│   └── hyperion.wasm       # Compiled 74 KB WebAssembly module
 └── archive/                # (Git-ignored) Local mirror of vintagecomputer.ca/files/Dynalogic Hyperion/
 ```
 

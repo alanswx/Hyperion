@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "../src/hyperion.h"
 
 static void dump_text_screen(const char *label) {
@@ -30,10 +31,18 @@ static void dump_text_screen(const char *label) {
 }
 
 int main(int argc, char **argv) {
-    const char *disk_path = (argc > 1) ? argv[1] : "/Users/alans/dev2/Hyperion/archive/software/HYPMSTRU.IMD";
+    const char *disk_path = (argc > 1) ? argv[1] : "web/disks/HYPDOS21.IMD";
     int bios_ver = (argc > 2) ? atoi(argv[2]) : 7;
 
     emu_init(bios_ver, 256);
+
+    time_t rawtime;
+    time(&rawtime);
+    struct tm *t = localtime(&rawtime);
+    if (t) {
+        emu_set_rtc(t->tm_year + 1900, t->tm_mon + 1, t->tm_mday, t->tm_wday,
+                    t->tm_hour, t->tm_min, t->tm_sec);
+    }
 
     FILE *f = fopen(disk_path, "rb");
     if (f) {

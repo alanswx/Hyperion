@@ -145,6 +145,7 @@ static uint8_t  dma_mask = 0x0F;
 #define FDC_SECTOR_SIZE  512
 
 static uint8_t  floppy_mounted[FDC_MAX_DRIVES];
+static uint8_t  floppy_wp[FDC_MAX_DRIVES];      /* write protect tab (emu_set_write_protect) */
 static uint8_t  floppy_spt[FDC_MAX_DRIVES];
 #ifndef __wasm__
 static uint8_t  floppy_data[FDC_MAX_DRIVES][FDC_MAX_CYLS][FDC_MAX_HEADS][FDC_MAX_SECTORS][FDC_SECTOR_SIZE];
@@ -171,6 +172,7 @@ static uint8_t  kbd_latch = 0x00; /* Value CPU sees after NOT AL */
 static uint8_t  kbd_last_out = 0xFF;
 static uint8_t  kbd_waiting_ack = 0;
 static int32_t  kbd_irq_delay = 0;
+static uint8_t  pc_kbd_port = 0;   /* option, not Hyperion hardware: IBM port 60h + port 61h bit 7 acknowledge */
 
 /* 8255 PPI + MSM5832 Real-Time Clock (Ports 0x140 - 0x143) */
 static uint8_t  ppi_port_a = 0x20;
@@ -334,6 +336,7 @@ static void fdc_execute_command(void) {
         uint8_t hd  = (fdc_cmd_buf[1] >> 2) & 1;
         uint8_t st3 = 0x28 | (hd << 2) | drv;
         if (fdc_cur_cyl[drv] == 0) st3 |= 0x10; /* Track 0 */
+        if (floppy_wp[drv]) st3 |= 0x40;        /* Write protected */
         fdc_res_buf[0] = st3;
         fdc_res_len = 1;
         return;
@@ -395,6 +398,20 @@ static void fdc_execute_command(void) {
         if (!floppy_mounted[drv] || c >= FDC_MAX_CYLS || r < 1) {
             fdc_res_buf[0] = 0x40 | (h << 2) | drv;
             fdc_res_buf[1] = 0x04; /* No Data / Not Ready */
+            fdc_res_buf[2] = 0x00;
+            fdc_res_buf[3] = c;
+            fdc_res_buf[4] = h;
+            fdc_res_buf[5] = r;
+            fdc_res_buf[6] = n;
+            fdc_res_len = 7;
+            fdc_irq_delay = 15;
+            return;
+        }
+
+        if (op == 0x05 && floppy_wp[drv]) {
+            /* Write Data on a protected disk: abnormal termination, ST1 NW */
+            fdc_res_buf[0] = 0x40 | (h << 2) | drv;
+            fdc_res_buf[1] = 0x02;
             fdc_res_buf[2] = 0x00;
             fdc_res_buf[3] = c;
             fdc_res_buf[4] = h;
@@ -541,6 +558,12 @@ static uint8_t io_read8(uint16_t port) {
         uint8_t res = pit_FlipFlop[ch] ? (uint8_t)(pit_count[ch] >> 8) : (uint8_t)(pit_count[ch] & 0xFF);
         pit_FlipFlop[ch] ^= 1;
         return res;
+    }
+
+    /* Option: the IBM PC's keyboard data port, the pending code as a PC scan code (BIOS table FE00:0714) */
+    if (port == 0x60 && pc_kbd_port) {
+        if (kbd_latch == 0xAA) return 0xAA;
+        return (uint8_t)((kbd_latch & 0x80) | active_bios_rom[0x0714 + (kbd_latch & 0x7F)]);
     }
 
     /* Speaker / System Status Register (0x61) */
@@ -735,6 +758,11 @@ static void io_write8(uint16_t port, uint8_t val) {
     /* Speaker / System Status (0x61) */
     if (port == 0x61) {
         port_61 = (port_61 & 0xFC) | (val & 0x03);
+        /* Option: an IBM-style acknowledge (bit 7 pulse) as the BIOS's write of 80h to port E0h */
+        if (pc_kbd_port && (val & 0x80) && kbd_waiting_ack) {
+            kbd_waiting_ack = 0;
+            if (kbd_q_head != kbd_q_tail) kbd_irq_delay = 50;
+        }
         return;
     }
 
@@ -1700,7 +1728,7 @@ static void render_display(void) {
             for (int bx = 0; bx < 80; bx++) {
                 uint8_t b = vram[row_off + bx];
                 for (int bit = 0; bit < 8; bit++) {
-                    row_out[bx * 8 + bit] = (b & (0x80 >> bit)) ? amber_palette[2] : amber_palette[0];
+                    row_out[bx * 8 + bit] = (b & (0x80 >> bit)) ? amber_palette[3] : amber_palette[0]; /* MM: hi-res on = both grey bits */
                 }
             }
         }
@@ -1738,7 +1766,7 @@ static void render_display(void) {
                 for (int bx = 0; bx < 80; bx++) {
                     uint8_t b = vram[vram_off + bx];
                     for (int bit = 0; bit < 8; bit++) {
-                        row_out[bx * 8 + bit] = (b & (0x80 >> bit)) ? amber_palette[2] : amber_palette[0];
+                        row_out[bx * 8 + bit] = (b & (0x80 >> bit)) ? amber_palette[3] : amber_palette[0]; /* MM: hi-res on = both grey bits */
                     }
                 }
             } else {
@@ -1758,7 +1786,7 @@ static void render_display(void) {
 
     /* Alphanumeric Text Mode (80x25 or 40x25, 8x10 character cells = 640x250) */
     int cols = (mode == 0 || mode == 1 || mode == 0x80 || mode == 0x81) ? 40 : 80;
-    int is_hyperion_attr = (mode >= 0x80) || ((mem[0x410] & 0x30) == 0x30);
+    int is_hyperion_attr = (mode >= 0x80);
     uint16_t page_offset = (uint16_t)(mem[0x44E] | ((uint16_t)mem[0x44F] << 8));
     uint8_t active_page  = mem[0x462] & 7;
     uint8_t cur_col      = mem[0x450 + active_page * 2];
@@ -1806,10 +1834,10 @@ static void render_display(void) {
                 } else if (fg == 7 && bg == 7) {
                     rev_video = 1;
                     blank = 1;
-                } else if (bg == 7 && fg == 0) {
-                    rev_video = 1;
-                } else if ((attr & 0x07) == 0x01) {
-                    underline = 1;
+                } else if (bg == 7) {
+                    rev_video = 1;      /* Table II-N: 111 XXX, XXX any but 000/111 */
+                } else if (fg == 1 && bg == 0 && vram_map_reg == 3) {
+                    underline = 1;      /* monochrome adapter mapping only */
                 }
                 if (attr & 0x08) fg_idx = 3;
                 if (attr & 0x80) blink = 1;
@@ -1836,7 +1864,7 @@ static void render_display(void) {
 
             for (int sy = 0; sy < 10; sy++) {
                 int glyph_row = sy;
-                if (sup && !sub) glyph_row = sy + 2;
+                if (sup && !sub) glyph_row = sy + 1;   /* MM: scan count + 1 */
                 else if (sub && !sup) glyph_row = (sy >= 2) ? (sy - 2) : 15;
                 uint8_t raw_bits = (glyph_row >= 0 && glyph_row < 16) ? glyph[glyph_row] : 0;
                 uint8_t bits = raw_bits;
@@ -1976,6 +2004,14 @@ int emu_load_disk(int drive, const uint8_t *data, int len) {
     floppy_spt[drive] = (uint8_t)spt;
     floppy_mounted[drive] = 1;
     return 40 * heads;
+}
+
+WASM_EXPORT("emu_set_pc_keyboard_port")
+void emu_set_pc_keyboard_port(int on) { pc_kbd_port = on ? 1 : 0; }
+
+WASM_EXPORT("emu_set_write_protect")
+void emu_set_write_protect(int drive, int on) {
+    if (drive >= 0 && drive < FDC_MAX_DRIVES) floppy_wp[drive] = on ? 1 : 0;
 }
 
 WASM_EXPORT("emu_eject_disk")

@@ -34,7 +34,7 @@ disks:
 test: wasm
 	@mkdir -p build
 	$(HOST_CC) $(CFLAGS) src/hyperion.c tests/test_boot.c -o build/test_boot
-	./build/test_boot web/disks/HYPMSTRU.IMD
+	./build/test_boot web/disks/HYPDOS21.IMD
 
 serve: wasm disks
 	@echo "Serving Hyperion WebAssembly Emulator at http://localhost:8080/web/"
