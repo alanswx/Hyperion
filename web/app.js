@@ -302,6 +302,7 @@
     if (!ex) return;
     // Allow browser paste (Ctrl+V / Cmd+V)
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
+    if (e.repeat) return;
     const xt = CODE_TO_XT_SCANCODE[e.code];
     if (xt) {
       e.preventDefault();

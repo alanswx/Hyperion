@@ -1668,13 +1668,13 @@ int emu_step(int instructions) {
             pic_request_irq(1); /* IRQ1: Keyboard */
         }
 
-        /* IRQ2: CRT Vertical Retrace (60 Hz -> ~8,000 instructions) */
-        if ((inst_counter & 0x1FFF) == 0) {
+        /* IRQ2: CRT Vertical Retrace (60 Hz -> 45,000 instructions per frame) */
+        if ((inst_counter % 45000) == 0) {
             pic_request_irq(2);
         }
 
-        /* IRQ0: 8253 PIT Channel 0 Timer (18.2 Hz -> ~26,000 instructions) */
-        if ((inst_counter % 26000) == 0) {
+        /* IRQ0: 8253 PIT Channel 0 Timer (18.2 Hz -> ~148,350 instructions) */
+        if ((inst_counter % 148350) == 0) {
             pic_request_irq(0);
         }
 
