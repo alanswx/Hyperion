@@ -80,6 +80,7 @@
   const btnColdReset = document.getElementById("btn-cold-reset");
   const btnAudio = document.getElementById("btn-audio");
   const btnCrtFx = document.getElementById("btn-crt-fx");
+  const btnFullscreen = document.getElementById("btn-fullscreen");
 
   const diskSelects = [
     document.getElementById("disk-select-0"),
@@ -393,6 +394,38 @@
     btnCrtFx.classList.toggle("active", active);
     btnCrtFx.setAttribute("aria-pressed", String(active));
   });
+
+  function toggleFullscreen() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      if (crtWrap.requestFullscreen) {
+        crtWrap.requestFullscreen();
+      } else if (crtWrap.webkitRequestFullscreen) {
+        crtWrap.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  }
+
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener("click", toggleFullscreen);
+  }
+  crtWrap.addEventListener("dblclick", toggleFullscreen);
+
+  function onFullscreenChange() {
+    const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (btnFullscreen) {
+      btnFullscreen.classList.toggle("active", isFs);
+      btnFullscreen.setAttribute("aria-pressed", String(isFs));
+      btnFullscreen.textContent = isFs ? "Exit Fullscreen" : "Fullscreen";
+    }
+  }
+  document.addEventListener("fullscreenchange", onFullscreenChange);
+  document.addEventListener("webkitfullscreenchange", onFullscreenChange);
 
   btnAudio.addEventListener("click", () => {
     if (!audioCtx) {
