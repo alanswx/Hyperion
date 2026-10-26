@@ -721,6 +721,10 @@ static void handle_hd_trap(uint8_t dummy) {
 }
 
 static void hd_update_rom(void) {
+    if (!hd_mounted) return;
+    for (int i = 0; i < 2048; i++) {
+        hd_option_rom[i] = hd_option_rom_default[i];
+    }
     hd_option_rom[0x110] = (uint8_t)(hd_cyls & 0xFF);
     hd_option_rom[0x111] = (uint8_t)(hd_cyls >> 8);
     hd_option_rom[0x112] = hd_heads;
@@ -1313,6 +1317,7 @@ void emu_reset(int warm) {
     irq0_counter = 0;
     hd_led_timer = 0;
     hd_last_status = 0;
+    if (hd_mounted) hd_update_rom();
 }
 
 WASM_EXPORT("emu_init")

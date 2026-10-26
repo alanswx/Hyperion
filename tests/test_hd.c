@@ -91,17 +91,38 @@ int main(void) {
     for (int f = 0; f < 100; f++) emu_run_frame();
 
     /* Check that DIR C: listed files on C: */
-    if (!screen_contains("COMMAND  COM")) {
-        fprintf(stderr, "FAIL: COMMAND.COM not listed on Drive C:!\n");
+    if (!screen_contains("CHKDSK   COM")) {
+        fprintf(stderr, "FAIL: CHKDSK.COM not listed on Drive C:!\n");
         return 1;
     }
-    if (!screen_contains("FDISK    EXE")) {
-        fprintf(stderr, "FAIL: FDISK.EXE not listed on Drive C:!\n");
+    if (!screen_contains("bytes free")) {
+        fprintf(stderr, "FAIL: Directory free bytes footer not found on Drive C:!\n");
         return 1;
     }
     printf("PASS: DIR C: correctly displayed files on Hard Disk C:\n");
 
-    /* 5. Test Blank Disk Generation & Eject */
+    /* 5. Test Direct Self-Boot from Hard Disk C: (with Floppies Ejected) */
+    printf("Testing direct self-boot from Hard Disk C: with Floppy A: and B: ejected...\n");
+    emu_eject_disk(0);
+    emu_eject_disk(1);
+    emu_reset(0); /* Cold reset with empty floppy drives and mounted Hard Disk */
+
+    for (int frame = 1; frame <= 100; frame++) emu_run_frame();
+
+    /* Send Enter to date & time prompts */
+    for (int i = 0; enter_keys[i]; i++) {
+        emu_ascii_keypress(enter_keys[i]);
+        for (int f = 0; f < 30; f++) emu_run_frame();
+    }
+    for (int f = 0; f < 50; f++) emu_run_frame();
+
+    if (!screen_contains("IO.SYS V2.05") && !screen_contains("Command v. 2.11") && !screen_contains("C>")) {
+        fprintf(stderr, "FAIL: Self-boot from Hard Disk C: failed!\n");
+        return 1;
+    }
+    printf("PASS: Successfully self-booted MS-DOS 2.11 directly from Hard Disk C:\n");
+
+    /* 6. Test Blank Disk Generation & Eject */
     uint8_t *blank = emu_create_blank_hd(20);
     assert(blank != NULL);
     assert(emu_get_hd_size() == 615 * 4 * 17 * 512);

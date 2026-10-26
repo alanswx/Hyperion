@@ -706,14 +706,14 @@
       sendAsciiString("\r\rB:\rMP\r", 25);
       teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
     } else if (presetName === "hd") {
-      diskSelects[0].value = "HYPDOS21.IMD";
-      diskSelects[1].value = "MULTIPLN.IMD";
+      diskSelects[0].value = "";
+      diskSelects[1].value = "";
       if (!diskSelectHd.value) diskSelectHd.value = "HYP10MB.IMG";
       await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
       resetMachine(false);
       fastForwardBoot();
-      sendAsciiString("\r\rC:\rDIR\r", 25);
-      teleStatus.textContent = "Booted MS-DOS 2.11 into Hard Disk C:";
+      sendAsciiString("\r\rDIR\r", 25);
+      teleStatus.textContent = "Self-booted MS-DOS 2.11 from Hard Disk C:";
     } else {
       // Default: Hyperion MS-DOS 2.11 System Diskette
       diskSelects[0].value = "HYPDOS21.IMD";
