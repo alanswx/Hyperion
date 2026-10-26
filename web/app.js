@@ -95,7 +95,6 @@
     document.getElementById("disk-wp-1")
   ];
   const speedSelect = document.getElementById("speed-select");
-  let speedMultiplier = 1;
   const btnPcKbd = document.getElementById("btn-pc-kbd");
   let pcKbdPort = false;
   const diskStatuses = [
