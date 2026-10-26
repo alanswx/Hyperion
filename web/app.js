@@ -3,7 +3,7 @@
  */
 
 (() => {
-  const BUILD_VERSION = "20261025-revert-kbd";
+  const BUILD_VERSION = "20261025-surf3d";
   const SCREEN_W = 640;
   const SCREEN_H = 250;
 
@@ -745,6 +745,17 @@
     teleStatus.textContent = "Launching Microsoft Multiplan (B:MP)...";
     crtWrap.focus();
   });
+
+  const macroSurf3d = document.getElementById("macro-surf3d");
+  if (macroSurf3d) {
+    macroSurf3d.addEventListener("click", async () => {
+      if (!diskSelectHd.value) diskSelectHd.value = "HYP10MB.IMG";
+      await loadSelectedHd();
+      sendAsciiString("C:\rSURF3D\r", 35);
+      teleStatus.textContent = "Launching Dynalogic 3D Wireframe Demo (C:SURF3D)...";
+      crtWrap.focus();
+    });
+  }
 
   // Dorado-style "Try it" buttons in #guide
   document.querySelectorAll("#guide button.try").forEach((btn) => {

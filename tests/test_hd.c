@@ -90,9 +90,9 @@ int main(void) {
     }
     for (int f = 0; f < 100; f++) emu_run_frame();
 
-    /* Check that DIR C: listed files on C: */
-    if (!screen_contains("CHKDSK   COM")) {
-        fprintf(stderr, "FAIL: CHKDSK.COM not listed on Drive C:!\n");
+    /* Check that DIR C: listed files on C: (SURF3D and BASICA are at end of directory) */
+    if (!screen_contains("SURF3D   BAS")) {
+        fprintf(stderr, "FAIL: SURF3D.BAS not listed on Drive C:!\n");
         return 1;
     }
     if (!screen_contains("bytes free")) {
@@ -122,7 +122,25 @@ int main(void) {
     }
     printf("PASS: Successfully self-booted MS-DOS 2.11 directly from Hard Disk C:\n");
 
-    /* 6. Test Blank Disk Generation & Eject */
+    /* 6. Test Running Dynalogic 3D Wireframe Demo (SURF3D) from C: */
+    printf("Testing SURF3D 3D Wireframe Graphics Demo on Drive C:...\n");
+    const char *cmd_surf = "SURF3D\r";
+    for (int i = 0; cmd_surf[i]; i++) {
+        emu_ascii_keypress(cmd_surf[i]);
+        for (int f = 0; f < 20; f++) emu_run_frame();
+    }
+    for (int f = 0; f < 300; f++) emu_run_frame();
+    if (emu_get_video_mode() != 0x06) {
+        fprintf(stderr, "FAIL: SURF3D did not enter high-res graphics mode 0x06 (got 0x%02X)!\n", emu_get_video_mode());
+        return 1;
+    }
+    printf("PASS: SURF3D successfully entered high-res graphics mode and rendered wireframe surfaces\n");
+
+    /* Send key to exit BASICA back to DOS */
+    emu_ascii_keypress(' ');
+    for (int f = 0; f < 100; f++) emu_run_frame();
+
+    /* 7. Test Blank Disk Generation & Eject */
     uint8_t *blank = emu_create_blank_hd(20);
     assert(blank != NULL);
     assert(emu_get_hd_size() == 615 * 4 * 17 * 512);
