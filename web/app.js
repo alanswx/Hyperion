@@ -3,7 +3,7 @@
  */
 
 (() => {
-  const BUILD_VERSION = "20261025-keypulse-v1";
+  const BUILD_VERSION = "20261025-revert-kbd";
   const SCREEN_W = 640;
   const SCREEN_H = 250;
 
@@ -135,23 +135,6 @@
   let oscNode = null;
   let gainNode = null;
   let audioEnabled = false;
-
-  const MODIFIER_XT_CODES = new Set([0x2A, 0x36, 0x1D, 0x38]); // ShiftLeft, ShiftRight, Ctrl, Alt
-  let totalFramesRun = 0;
-  const pendingKeyReleases = new Map();
-
-  function stepEmulatorFrame() {
-    ex.emu_run_frame();
-    totalFramesRun++;
-    if (pendingKeyReleases.size > 0) {
-      for (const [xt, targetFrame] of pendingKeyReleases.entries()) {
-        if (totalFramesRun >= targetFrame) {
-          ex.emu_xt_key_event(xt, 0);
-          pendingKeyReleases.delete(xt);
-        }
-      }
-    }
-  }
 
   function syncRtcToHost() {
     if (!ex) return;
@@ -319,7 +302,7 @@
     const vramPtr = ex.emu_get_vram();
     const ramPtr = ex.emu_get_ram();
     for (let i = 0; i < maxFrames; i++) {
-      stepEmulatorFrame();
+      ex.emu_run_frame();
       const ram = new Uint8Array(wasmMemory.buffer, ramPtr, 0x500);
       const pageOff = ram[0x44E] | (ram[0x44F] << 8);
       const vram = new Uint8Array(wasmMemory.buffer, vramPtr + pageOff, 4000);
@@ -340,7 +323,7 @@
         }
       }
       if (found) {
-        for (let extra = 0; extra < 25; extra++) stepEmulatorFrame();
+        for (let extra = 0; extra < 25; extra++) ex.emu_run_frame();
         break;
       }
     }
@@ -393,7 +376,7 @@
         const start = performance.now();
         let ran = 0;
         while (performance.now() - start < 12 && ran < 20) {
-          stepEmulatorFrame();
+          ex.emu_run_frame();
           ran++;
         }
         emuFramesExecuted += ran;
@@ -404,7 +387,7 @@
         if (framesToRun > 0) {
           frameAccumulator -= framesToRun * TARGET_FRAME_MS;
           for (let i = 0; i < framesToRun; i++) {
-            stepEmulatorFrame();
+            ex.emu_run_frame();
           }
           emuFramesExecuted += framesToRun;
         }
@@ -474,7 +457,8 @@
   function tapXtKey(xtCode) {
     if (!ex) return;
     ex.emu_xt_key_event(xtCode, 1);
-    pendingKeyReleases.set(xtCode, totalFramesRun + 2);
+    const delay = speedMode === "max" ? 10 : Math.max(15, Math.round(40 / Math.min(speedMultiplier, 4)));
+    setTimeout(() => ex.emu_xt_key_event(xtCode, 0), delay);
   }
 
   // Event Listeners (Capture keyboard globally unless typing in an input/textarea)
@@ -484,23 +468,12 @@
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     // Allow browser paste (Ctrl+V / Cmd+V)
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
-
+    if (e.repeat) return;
     const xt = CODE_TO_XT_SCANCODE[e.code];
-    if (!xt) return;
-
-    e.preventDefault();
-
-    if (MODIFIER_XT_CODES.has(xt)) {
-      if (!e.repeat) ex.emu_xt_key_event(xt, 1);
-      return;
+    if (xt) {
+      e.preventDefault();
+      ex.emu_xt_key_event(xt, 1);
     }
-
-    // Non-modifier keys:
-    // Pulse make code and schedule break code after 2 emulator frames.
-    // This guarantees a single, crisp keystroke even at 16x / Max speed,
-    // while allowing host OS typematic repeats when held down.
-    ex.emu_xt_key_event(xt, 1);
-    pendingKeyReleases.set(xt, totalFramesRun + 2);
   });
 
   window.addEventListener("keyup", (e) => {
@@ -509,11 +482,10 @@
     if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
     if ((e.ctrlKey || e.metaKey) && e.code === "KeyV") return;
     const xt = CODE_TO_XT_SCANCODE[e.code];
-    if (!xt) return;
-
-    e.preventDefault();
-    pendingKeyReleases.delete(xt);
-    ex.emu_xt_key_event(xt, 0);
+    if (xt) {
+      e.preventDefault();
+      ex.emu_xt_key_event(xt, 0);
+    }
   });
 
   // Clipboard Paste support (like Dorado)
