@@ -3,7 +3,7 @@
  */
 
 (() => {
-  const BUILD_VERSION = "20261025-surf3d";
+  const BUILD_VERSION = "20261025-surf3d-boot";
   const SCREEN_W = 640;
   const SCREEN_H = 250;
 
@@ -327,6 +327,67 @@
         break;
       }
     }
+  }
+
+  function fastForwardToPrompt(maxFrames = 1500) {
+    if (!ex) return;
+    const vramPtr = ex.emu_get_vram();
+    const ramPtr = ex.emu_get_ram();
+    let atDate = false;
+    let atTime = false;
+    for (let i = 0; i < maxFrames; i++) {
+      ex.emu_run_frame();
+      const ram = new Uint8Array(wasmMemory.buffer, ramPtr, 0x500);
+      const pageOff = ram[0x44E] | (ram[0x44F] << 8);
+      const vram = new Uint8Array(wasmMemory.buffer, vramPtr + pageOff, 4000);
+
+      let dateFound = false;
+      let timeFound = false;
+      let promptFound = false;
+
+      for (let offset = 0; offset < 2000; offset += 2) {
+        if ((vram[offset] === 100 || vram[offset] === 68) &&
+            (vram[offset+2] === 97 || vram[offset+2] === 65) &&
+            (vram[offset+4] === 116 || vram[offset+4] === 84) &&
+            (vram[offset+6] === 101 || vram[offset+6] === 69)) { // date
+          dateFound = true;
+        }
+        if ((vram[offset] === 116 || vram[offset] === 84) &&
+            (vram[offset+2] === 105 || vram[offset+2] === 73) &&
+            (vram[offset+4] === 109 || vram[offset+4] === 77) &&
+            (vram[offset+6] === 101 || vram[offset+6] === 69)) { // time
+          timeFound = true;
+        }
+        if ((vram[offset] === 67 || vram[offset] === 65) && vram[offset+2] === 62) { // C> or A>
+          promptFound = true;
+        }
+      }
+
+      if (dateFound && !atDate) {
+        atDate = true;
+        ex.emu_ascii_keypress(13);
+      } else if (timeFound && !atTime) {
+        atTime = true;
+        ex.emu_ascii_keypress(13);
+      } else if (promptFound && atTime) {
+        for (let extra = 0; extra < 30; extra++) ex.emu_run_frame();
+        break;
+      }
+    }
+  }
+
+  function isAtPrompt(promptChar = "C") {
+    if (!ex) return false;
+    const vramPtr = ex.emu_get_vram();
+    const ramPtr = ex.emu_get_ram();
+    const ram = new Uint8Array(wasmMemory.buffer, ramPtr, 0x500);
+    const pageOff = ram[0x44E] | (ram[0x44F] << 8);
+    const vram = new Uint8Array(wasmMemory.buffer, vramPtr + pageOff, 4000);
+    const target = promptChar.charCodeAt(0);
+    for (let i = 0; i < 2000; i += 2) {
+      if (vram[i] === target && vram[i + 2] === 62) return true;
+    }
+    return false;
   }
 
   function updateSoftKeyLabelsFromVram() {
@@ -749,10 +810,20 @@
   const macroSurf3d = document.getElementById("macro-surf3d");
   if (macroSurf3d) {
     macroSurf3d.addEventListener("click", async () => {
+      if (isAtPrompt("C")) {
+        sendAsciiString("SURF3D\r", 35);
+        teleStatus.textContent = "Launching Dynalogic 3D Wireframe Demo (SURF3D)...";
+        crtWrap.focus();
+        return;
+      }
+      diskSelects[0].value = "";
+      diskSelects[1].value = "";
       if (!diskSelectHd.value) diskSelectHd.value = "HYP10MB.IMG";
-      await loadSelectedHd();
-      sendAsciiString("C:\rSURF3D\r", 35);
-      teleStatus.textContent = "Launching Dynalogic 3D Wireframe Demo (C:SURF3D)...";
+      await Promise.all([loadSelectedDisk(0), loadSelectedDisk(1), loadSelectedHd()]);
+      resetMachine(false);
+      fastForwardToPrompt();
+      sendAsciiString("SURF3D\r", 35);
+      teleStatus.textContent = "Booted C: and launched Dynalogic 3D Wireframe Demo (SURF3D)...";
       crtWrap.focus();
     });
   }
