@@ -45,7 +45,7 @@ jobs:
       - name: Stamp cache-busting build ID into frontend assets
         run: |
           BUILD_ID=$(git rev-parse --short HEAD)
-          sed -e "s|hyperion\.wasm|hyperion.wasm?v=${BUILD_ID}|g" web/app.js > web/app.js.tmp && mv -f web/app.js.tmp web/app.js
+          sed -e "s|BUILD_VERSION = \".*\"|BUILD_VERSION = \"${BUILD_ID}\"|g" web/app.js > web/app.js.tmp && mv -f web/app.js.tmp web/app.js
           sed -e "s|src=\"app\.js\"|src=\"app.js?v=${BUILD_ID}\"|g" -e "s|href=\"style\.css\"|href=\"style.css?v=${BUILD_ID}\"|g" web/index.html > web/index.html.tmp && mv -f web/index.html.tmp web/index.html
 
       - name: Upload Pages artifact

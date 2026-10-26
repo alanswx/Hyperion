@@ -3,6 +3,7 @@
  */
 
 (() => {
+  const BUILD_VERSION = "20261025-bootc-v3";
   const SCREEN_W = 640;
   const SCREEN_H = 250;
 
@@ -150,14 +151,15 @@
   }
 
   async function fetchDiskImage(filename) {
+    const bust = `?v=${BUILD_VERSION}`;
     const candidates = [
-      `disks/${filename}`,
-      `../archive/software/${filename}`,
-      `../archive/software/Multimate/${filename}`
+      `disks/${filename}${bust}`,
+      `../archive/software/${filename}${bust}`,
+      `../archive/software/Multimate/${filename}${bust}`
     ];
     for (const url of candidates) {
       try {
-        const resp = await fetch(url);
+        const resp = await fetch(url, { cache: "no-cache" });
         if (resp.ok) {
           return new Uint8Array(await resp.arrayBuffer());
         }
@@ -290,6 +292,7 @@
       ex.emu_init(biosRev, ramKb);
       if (ex.emu_set_cpu_speed) ex.emu_set_cpu_speed(speedMultiplier);
       syncRtcToHost();
+      fastForwardBoot();
       teleStatus.textContent = `Cold Reset (BIOS ${biosRev === 1 ? "C1" : "C7"}, ${ramKb} KB RAM)`;
     }
   }
@@ -790,7 +793,7 @@
       const stackPtr = new WebAssembly.Global({ value: "i32", mutable: true }, 6 * 1024 * 1024);
       const fnTable = new WebAssembly.Table({ initial: 0, element: "anyfunc" });
 
-      const resp = await fetch("hyperion.wasm");
+      const resp = await fetch(`hyperion.wasm?v=${BUILD_VERSION}`, { cache: "no-cache" });
       const wasmBytes = await resp.arrayBuffer();
       const { instance } = await WebAssembly.instantiate(wasmBytes, {
         env: {
